@@ -10,6 +10,9 @@ const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
 
 if (!serviceAccount) {
     throw new Error("Missing FIREBASE_SERVICE_ACCOUNT_KEY in environment variables. Please add it to your .env.local or Vercel project settings.");
+} else {
+    // Fix private key formatting (replace literal \n with actual newlines)
+    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
 }
 
 export function initAdmin() {
