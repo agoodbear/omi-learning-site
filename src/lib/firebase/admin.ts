@@ -6,8 +6,11 @@ import { getStorage } from "firebase-admin/storage";
 
 const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
     ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    : require("@/../service-account-key.json"); // Fallback for local dev if env not set
+    : undefined;
+
+if (!serviceAccount) {
+    throw new Error("Missing FIREBASE_SERVICE_ACCOUNT_KEY in environment variables. Please add it to your .env.local or Vercel project settings.");
+}
 
 export function initAdmin() {
     if (getApps().length === 0) {
