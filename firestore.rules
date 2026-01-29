@@ -1,0 +1,105 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function isLoggedIn() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      // Hardcoded admin check matching client (should ideally use custom claims)
+      return request.auth != null && request.auth.token.email == '16022@omi.local';
+    }
+    
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // --- Users & Profiles ---
+    match /users/{uid} {
+      allow read, write: if isOwner(uid) || isAdmin();
+    }
+    
+    // --- Core Content ---
+    match /cases/{caseId} {
+      allow read: if isAdmin() || (isLoggedIn() && resource.data.status == 'published');
+      allow create, update, delete: if isAdmin();
+    }
+    
+    match /papers/{paperId} {
+      allow read: if isAdmin() || (isLoggedIn() && resource.data.status == 'published');
+      allow write: if isAdmin();
+
+      match /highlights/{highlightId} {
+        allow read: if isAdmin() || (isLoggedIn() && get(/databases/$(database)/documents/papers/$(paperId)).data.status == 'published');
+        // Admin only write for global highlights? Or users make their own highlights?
+        // Phase 3 code implies simple admin highlights. 
+        allow write: if isAdmin();
+      }
+    }
+
+    // --- Analytics & Gamification (Phase 4) ---
+    // Aggregated stats are updated via Server Actions (Admin SDK), 
+    // so users only need READ access.
+
+    match /userStats/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+    }
+
+    match /pointsStats/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+       // Allow listing for leaderboard (requires index)
+      allow list: if isLoggedIn();
+    }
+
+    match /userContentStatus/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+    }
+
+    match /caseStats/{caseId} {
+      allow read: if isLoggedIn();
+    }
+
+    // --- Events ---
+    // Client-side logging (if any remains) needs create.
+    // Server-side logging bypasses this.
+    // We allow create for own uid to support legacy/client log sources.
+    match /events/{eventId} {
+      allow create: if isLoggedIn() && request.resource.data.uid == request.auth.uid;
+      allow read: if isAdmin(); // Users don't need to read raw event logs
+    }
+
+    // --- Quiz Attempts ---
+    // Now handled by Server Action, so users don't need create access technically.
+    // But keeping create for backward compatibility if client code exists.
+    // If fully migrated, remove allow create.
+    match /attempts/{attemptId} {
+      allow read: if isOwner(resource.data.uid) || isAdmin();
+      // allow create: if isOwner(request.resource.data.uid); // Disabled favor of Server Action
+    }
+    
+    // Legacy Progress (Phase 3)
+    match /progress/{uid} {
+      allow read: if isOwner(uid);
+      // allow write: if isOwner(uid); // Disabled favor of Server Action
+    }
+
+    // --- Research & Clinical ---
+    match /clinicalEvents/{eventId} {
+      allow read, write: if isAdmin();
+    }
+    
+    match /researchConfig/{configId} {
+      allow read: if isAdmin(); // Or logged in if needed
+      allow write: if isAdmin();
+    }
+
+    // --- Social (Comments) ---
+    match /comments/{commentId} {
+      allow read: if isLoggedIn();
+      allow create: if isLoggedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isLoggedIn() && (request.resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if isLoggedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+  }
+}

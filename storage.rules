@@ -1,0 +1,26 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    function isAdmin() {
+      // Hardcoded admin check for now, matching client-side config
+      return request.auth != null && request.auth.token.email == '16022@omi.local';
+    }
+    
+    // Cases images: Admin write, authenticated read
+    match /cases/{caseId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+    
+    // Default deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+    // Papers storage
+    match /papers/{paperId}/{allPaths=**} {
+        allow read: if request.auth != null;
+        allow write: if isAdmin();
+    }
+  }
+}

@@ -1,0 +1,13 @@
+[
+    {
+        "origin": [
+            "http://localhost:3000",
+            "https://omi-ecg-learning-site.web.app",
+            "https://omi-ecg-learning-site.firebaseapp.com"
+        ],
+        "method": [
+            "GET"
+        ],
+        "maxAgeSeconds": 3600
+    }
+]
