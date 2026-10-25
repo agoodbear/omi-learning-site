@@ -16,7 +16,7 @@ export default function UserLeaderboard() {
         if (!user) return;
         async function load() {
             try {
-                const res = await getAdminUserStats(user!.uid);
+                const res = await getAdminUserStats(await user!.getIdToken());
                 if (res.success && res.data) {
                     setData(res.data);
                 }

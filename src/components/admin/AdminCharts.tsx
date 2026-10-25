@@ -19,7 +19,7 @@ export default function AdminCharts() {
 
         async function load() {
             try {
-                const res = await getAdminChartsData(user!.uid);
+                const res = await getAdminChartsData(await user!.getIdToken());
                 if (res.success && res.data) {
                     setData(res.data);
                 }

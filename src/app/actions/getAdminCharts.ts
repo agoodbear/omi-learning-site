@@ -1,10 +1,12 @@
 "use server";
 
+import { requireAdmin } from "@/lib/auth/server";
+
 import { adminDb } from "@/lib/firebase/admin";
 import { ResearchEvent } from "@/types/firestore-schema";
 
-export async function getAdminChartsData(uid: string) {
-    if (!uid) throw new Error("Unauthorized");
+export async function getAdminChartsData(idToken: string) {
+    await requireAdmin(idToken);
 
     // 1. Define Range (Last 30 Days)
     const now = new Date();

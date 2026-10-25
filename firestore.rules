@@ -1,50 +1,59 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
     function isLoggedIn() {
       return request.auth != null;
     }
-    
+
     function isAdmin() {
       // Hardcoded admin check matching client (should ideally use custom claims)
       return request.auth != null && request.auth.token.email == '16022@omi.local';
     }
-    
+
     function isOwner(uid) {
       return request.auth != null && request.auth.uid == uid;
     }
 
+    // 註冊後要管理員核准（users/{uid}.approved 只有 server action 能改）
+    function isApproved() {
+      return isAdmin() || (isLoggedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('approved', false) == true);
+    }
+
     // --- Users & Profiles ---
     match /users/{uid} {
-      allow read, write: if isOwner(uid) || isAdmin();
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isAdmin() ||
+        (isOwner(uid) && request.resource.data.get('approved', false) == false);
+      allow update: if isAdmin() ||
+        (isOwner(uid) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['approved', 'employeeId']));
+      allow delete: if isAdmin();
     }
-    
+
     // --- Core Content ---
     match /cases/{caseId} {
-      // Published cases readable by all logged-in users; pending/draft only by admin
-      allow read: if isAdmin() || (isLoggedIn() && resource.data.status == 'published');
-      // Allow logged-in users to create cases with 'pending' status (user submissions)
-      allow create: if isLoggedIn() && request.resource.data.status == 'pending';
-      // Admin has full update/delete rights
+      // Published cases readable by approved users; pending/draft only by admin
+      allow read: if isAdmin() || (isApproved() && resource.data.status == 'published');
+      // Approved users may submit cases with 'pending' status
+      allow create: if isAdmin() ||
+        (isApproved() && request.resource.data.status == 'pending' &&
+         request.resource.data.submittedBy.uid == request.auth.uid);
       allow update, delete: if isAdmin();
     }
-    
+
     match /papers/{paperId} {
-      allow read: if isAdmin() || (isLoggedIn() && resource.data.status == 'published');
+      allow read: if isAdmin() || (isApproved() && resource.data.status == 'published');
       allow write: if isAdmin();
 
       match /highlights/{highlightId} {
-        allow read: if isAdmin() || (isLoggedIn() && get(/databases/$(database)/documents/papers/$(paperId)).data.status == 'published');
-        // Admin only write for global highlights? Or users make their own highlights?
-        // Phase 3 code implies simple admin highlights. 
+        allow read: if isAdmin() || (isApproved() && get(/databases/$(database)/documents/papers/$(paperId)).data.status == 'published');
         allow write: if isAdmin();
       }
     }
 
-    // --- Analytics & Gamification (Phase 4) ---
-    // Aggregated stats are updated via Server Actions (Admin SDK), 
-    // so users only need READ access.
+    // --- Analytics & Gamification ---
+    // Aggregated stats are written by server actions (Admin SDK) only.
 
     match /userStats/{uid} {
       allow read: if isOwner(uid) || isAdmin();
@@ -52,8 +61,8 @@ service cloud.firestore {
 
     match /pointsStats/{uid} {
       allow read: if isOwner(uid) || isAdmin();
-       // Allow listing for leaderboard (requires index)
-      allow list: if isLoggedIn();
+      // Leaderboard
+      allow list: if isApproved();
     }
 
     match /userContentStatus/{uid} {
@@ -61,49 +70,45 @@ service cloud.firestore {
     }
 
     match /caseStats/{caseId} {
-      allow read: if isLoggedIn();
+      allow read: if isApproved();
     }
 
     // --- Events ---
-    // Client-side logging (if any remains) needs create.
-    // Server-side logging bypasses this.
-    // We allow create for own uid to support legacy/client log sources.
     match /events/{eventId} {
-      allow create: if isLoggedIn() && request.resource.data.uid == request.auth.uid;
-      allow read: if isAdmin(); // Users don't need to read raw event logs
+      allow create: if isApproved() && request.resource.data.uid == request.auth.uid;
+      allow read: if isAdmin();
     }
 
-    // --- Quiz Attempts ---
-    // Now handled by Server Action, so users don't need create access technically.
-    // But keeping create for backward compatibility if client code exists.
-    // If fully migrated, remove allow create.
+    // --- Quiz Attempts (written by server action) ---
     match /attempts/{attemptId} {
       allow read: if isOwner(resource.data.uid) || isAdmin();
-      // allow create: if isOwner(request.resource.data.uid); // Disabled favor of Server Action
     }
-    
+
     // Legacy Progress (Phase 3)
     match /progress/{uid} {
       allow read: if isOwner(uid);
-      // allow write: if isOwner(uid); // Disabled favor of Server Action
     }
 
-    // --- Research & Clinical ---
+    // --- Research ---
+    // 臨床資料（病人層級）只在本機分析，不放 Firebase。
     match /clinicalEvents/{eventId} {
-      allow read, write: if isAdmin();
+      allow read, write: if false;
     }
-    
+
     match /researchConfig/{configId} {
-      allow read: if isAdmin(); // Or logged in if needed
-      allow write: if isAdmin();
+      allow read, write: if isAdmin();
     }
 
     // --- Social (Comments) ---
     match /comments/{commentId} {
-      allow read: if isLoggedIn();
-      allow create: if isLoggedIn() && request.resource.data.userId == request.auth.uid;
-      allow update: if isLoggedIn() && (request.resource.data.userId == request.auth.uid || isAdmin());
-      allow delete: if isLoggedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow read: if isApproved();
+      allow create: if isApproved() && request.resource.data.userId == request.auth.uid;
+      // 作者可改自己的留言；其他人只能動表情回應
+      allow update: if isAdmin() ||
+        (isApproved() && resource.data.userId == request.auth.uid &&
+         request.resource.data.userId == request.auth.uid) ||
+        (isApproved() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions']));
+      allow delete: if isAdmin() || (isLoggedIn() && resource.data.userId == request.auth.uid);
     }
   }
 }

@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/auth/AuthContext";
 import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
+import ApprovalGate from "@/components/ApprovalGate";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -26,7 +27,7 @@ export default function RootLayout({
             <div className="flex flex-1 w-full">
               <Sidebar />
               <main className="flex-1 w-full min-w-0">
-                {children}
+                <ApprovalGate>{children}</ApprovalGate>
               </main>
             </div>
           </div>

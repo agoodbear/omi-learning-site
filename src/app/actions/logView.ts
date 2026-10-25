@@ -1,17 +1,15 @@
 "use server";
 
+import { requireApproved } from "@/lib/auth/server";
+
 import { adminDb } from "@/lib/firebase/admin";
 import { FieldValue } from "firebase-admin/firestore";
 
-export async function logView(uid: string, type: "case" | "paper", id: string, meta: any = {}) {
-    if (!uid) return;
+export async function logView(idToken: string, type: "case" | "paper", id: string, meta: any = {}) {
+    const { uid, employeeId } = await requireApproved(idToken);
 
     const batch = adminDb.batch();
     const timestamp = FieldValue.serverTimestamp();
-
-    // 0. Fetch Employee ID
-    const userDoc = await adminDb.collection("users").doc(uid).get();
-    const employeeId = userDoc.data()?.employeeId || "UNKNOWN";
 
     // 1. Log Event
     const eventRef = adminDb.collection("events").doc();

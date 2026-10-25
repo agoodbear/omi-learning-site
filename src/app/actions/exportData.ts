@@ -1,5 +1,7 @@
 "use server";
 
+import { requireAdmin } from "@/lib/auth/server";
+
 import { adminDb } from "@/lib/firebase/admin";
 import { Timestamp } from "firebase-admin/firestore";
 
@@ -22,10 +24,8 @@ function sanitizeData(data: any): any {
     return data;
 }
 
-export async function exportCollection(uid: string, collectionName: string) {
-    if (!uid) throw new Error("Unauthorized");
-
-    // In a real app, verify admin status again here.
+export async function exportCollection(idToken: string, collectionName: string) {
+    await requireAdmin(idToken);
 
     const allowedCollections = [
         "users",

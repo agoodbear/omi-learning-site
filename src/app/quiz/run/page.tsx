@@ -121,22 +121,13 @@ function QuizRunner() {
         if (!user) return;
         setLoading(true);
 
-        const correctCount = attemptItems.filter(i => i.isCorrect).length;
-
-        // Prepare serializable data for Server Action
         const payload = {
             categoryFilter: category as any,
-            total: questions.length,
-            correct: correctCount,
-            items: attemptItems.map(item => ({
-                ...item,
-                // Convert Firestore Timestamp to Date for serialization
-                answeredAt: item.answeredAt.toDate()
-            }))
+            items: attemptItems.map(item => ({ caseId: item.caseId, selected: item.selected })),
         };
 
         try {
-            const result = await submitQuizAttempt(user.uid, payload as any);
+            const result = await submitQuizAttempt(await user.getIdToken(), payload);
 
             if (result.success) {
                 // Determine if bonus was earned for notification (optional)

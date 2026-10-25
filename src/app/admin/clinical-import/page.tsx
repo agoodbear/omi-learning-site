@@ -49,7 +49,7 @@ export default function ClinicalImportPage() {
             complete: async (results) => {
                 const data = results.data;
                 try {
-                    const result = await importClinicalData(user.uid, data);
+                    const result = await importClinicalData(await user.getIdToken(), data);
 
                     if (result.success) {
                         setStatus({ type: 'success', message: `成功匯入 ${result.count} 筆紀錄。` });

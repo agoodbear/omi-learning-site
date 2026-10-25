@@ -1,5 +1,7 @@
 "use server";
 
+import { requireAdmin } from "@/lib/auth/server";
+
 import { adminDb } from "@/lib/firebase/admin";
 import { UserStats, PointsStats } from "@/types/firestore-schema";
 
@@ -15,8 +17,8 @@ export interface AdminUserStatRow {
     lastActivityAt: string | null;
 }
 
-export async function getAdminUserStats(uid: string) {
-    if (!uid) throw new Error("Unauthorized");
+export async function getAdminUserStats(idToken: string) {
+    await requireAdmin(idToken);
 
     try {
         // 1. Fetch Users (Profile Data)

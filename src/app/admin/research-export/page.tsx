@@ -29,7 +29,7 @@ export default function ResearchExportPage() {
         setStatus(null);
 
         try {
-            const result = await exportCollection(user.uid, collectionId);
+            const result = await exportCollection(await user.getIdToken(), collectionId);
 
             if (!result.success || !result.data) {
                 throw new Error(result.error || "匯入失敗");
@@ -74,7 +74,7 @@ export default function ResearchExportPage() {
         setStatus(null);
         try {
             // Call the specialized server action
-            const result = await genLinked(user.uid);
+            const result = await genLinked(await user.getIdToken());
 
             if (!result.success || !result.csv) {
                 throw new Error("關聯資料匯出無數據。");

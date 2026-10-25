@@ -1,18 +1,41 @@
 "use server";
 
 import { adminDb } from "@/lib/firebase/admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { requireApproved } from "@/lib/auth/server";
 import { QuizAttempt, AttemptItem } from "@/types/firestore-schema";
 
-export async function submitQuizAttempt(uid: string, attemptData: Omit<QuizAttempt, "id" | "createdAt" | "uid">) {
-    if (!uid) throw new Error("User ID is required");
+export interface QuizSubmission {
+    categoryFilter: QuizAttempt["categoryFilter"];
+    items: { caseId: string; selected: number }[];
+}
+
+export async function submitQuizAttempt(idToken: string, submission: QuizSubmission) {
+    const { uid, employeeId } = await requireApproved(idToken);
+    if (!submission.items?.length) throw new Error("No answers submitted");
 
     const batch = adminDb.batch();
     const timestamp = FieldValue.serverTimestamp();
 
-    // 0. Fetch Employee ID (Secure Source of Truth)
-    const userDoc = await adminDb.collection("users").doc(uid).get();
-    const employeeId = userDoc.data()?.employeeId || "UNKNOWN";
+    // 0. Grade on the server: the browser only reports which choice was picked.
+    const caseRefs = submission.items.map(i => adminDb.collection("cases").doc(i.caseId));
+    const caseSnaps = await adminDb.getAll(...caseRefs);
+    const items: AttemptItem[] = submission.items.map((item, idx) => {
+        const caseData = caseSnaps[idx].data();
+        if (!caseData || caseData.status !== "published") throw new Error("Invalid case");
+        return {
+            caseId: item.caseId,
+            selected: item.selected,
+            isCorrect: item.selected === caseData.correct_answer,
+            answeredAt: Timestamp.now() as unknown as AttemptItem["answeredAt"],
+        };
+    });
+    const attemptData = {
+        categoryFilter: submission.categoryFilter,
+        total: items.length,
+        correct: items.filter(i => i.isCorrect).length,
+        items,
+    };
 
     // 1. Create Attempt Document
     const attemptRef = adminDb.collection("attempts").doc();

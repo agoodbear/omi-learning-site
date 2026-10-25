@@ -5,12 +5,14 @@ import { db } from "@/lib/firebase";
 import { collection, query, getDocs, doc, updateDoc, Timestamp, orderBy } from "firebase/firestore";
 import { Case, CaseCategory } from "@/types/firestore-schema";
 import Link from "next/link";
+import { useAuth } from "@/lib/auth/AuthContext";
 import { Plus, Edit, Eye, EyeOff, Archive, Trash2, Filter } from "lucide-react";
 import { deleteCase } from "@/app/actions/deleteContent";
 
 type CaseStatus = "draft" | "published" | "archived";
 
 export default function AdminCasesPage() {
+    const { user } = useAuth();
     const [cases, setCases] = useState<Case[]>([]);
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState<CaseStatus | "all">("all");
@@ -59,7 +61,7 @@ export default function AdminCasesPage() {
         if (!confirm(`確定要刪除案例 "${title}" 嗎？此動作無法復原。`)) return;
 
         try {
-            const res = await deleteCase(caseId);
+            const res = await deleteCase(await user!.getIdToken(), caseId);
             if (res.success) {
                 setCases(prev => prev.filter(c => c.id !== caseId));
             } else {

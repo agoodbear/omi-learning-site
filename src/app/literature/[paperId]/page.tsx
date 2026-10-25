@@ -187,9 +187,9 @@ export default function LiteratureDetailPage() {
     const hasLoggedView = useRef(false);
     useEffect(() => {
         if (user && paper && !hasLoggedView.current) {
-            logView(user.uid, "paper", paper.id!, {
-                title: paper.title
-            });
+            const id = paper.id!;
+            const meta = { title: paper.title };
+            user.getIdToken().then(token => logView(token, "paper", id, meta)).catch(console.error);
             hasLoggedView.current = true;
         }
     }, [user, paper]);

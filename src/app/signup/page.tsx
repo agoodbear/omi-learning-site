@@ -30,6 +30,7 @@ export default function SignupPage() {
             await setDoc(doc(db, "users", user.uid), {
                 uid: user.uid,
                 employeeId,
+                approved: false,
                 createdAt: serverTimestamp(),
                 lastLoginAt: serverTimestamp(),
             });

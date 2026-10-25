@@ -1,5 +1,7 @@
 "use server";
 
+import { requireAdmin } from "@/lib/auth/server";
+
 import { adminDb } from "@/lib/firebase/admin";
 import { Timestamp } from "firebase-admin/firestore";
 
@@ -16,8 +18,10 @@ function diffDays(eventTime: Timestamp, anchorTime: Timestamp): number {
     return (anchorTime.toMillis() - eventTime.toMillis()) / msPerDay;
 }
 
-export async function generateLinkedExport(uid: string) {
-    if (!uid) throw new Error("Unauthorized");
+export async function generateLinkedExport(idToken: string) {
+    await requireAdmin(idToken);
+    // 臨床資料（病人層級）只在本機分析，不上傳到 Firebase。
+    throw new Error("已停用：臨床資料改在本機離線比對");
 
     // 1. Fetch all Clinical Events
     const clinicalSnap = await adminDb.collection("clinicalEvents").get();

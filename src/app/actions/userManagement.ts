@@ -1,22 +1,17 @@
 "use server";
 
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
-import { isAdmin, emailToEmployeeId } from "@/lib/auth/utils";
+import { requireAdmin } from "@/lib/auth/server";
 import { revalidatePath } from "next/cache";
 
 /**
  * Delete a user by UID. Admin only.
  */
-export async function deleteUserAction(adminUid: string, targetUid: string) {
-    // Verify admin
-    const adminUser = await adminAuth.getUser(adminUid);
-    const adminEmployeeId = emailToEmployeeId(adminUser.email);
-    if (!adminEmployeeId || !isAdmin(adminEmployeeId)) {
-        return { success: false, error: "Unauthorized" };
-    }
+export async function deleteUserAction(idToken: string, targetUid: string) {
+    const admin = await requireAdmin(idToken);
 
     // Prevent self-deletion
-    if (adminUid === targetUid) {
+    if (admin.uid === targetUid) {
         return { success: false, error: "無法刪除自己的帳號" };
     }
 
@@ -42,13 +37,8 @@ export async function deleteUserAction(adminUid: string, targetUid: string) {
 /**
  * Reset a user's password. Admin only.
  */
-export async function resetPasswordAction(adminUid: string, targetUid: string, newPassword: string) {
-    // Verify admin
-    const adminUser = await adminAuth.getUser(adminUid);
-    const adminEmployeeId = emailToEmployeeId(adminUser.email);
-    if (!adminEmployeeId || !isAdmin(adminEmployeeId)) {
-        return { success: false, error: "Unauthorized" };
-    }
+export async function resetPasswordAction(idToken: string, targetUid: string, newPassword: string) {
+    await requireAdmin(idToken);
 
     // Validate password
     if (!newPassword || newPassword.length < 6) {
@@ -61,5 +51,21 @@ export async function resetPasswordAction(adminUid: string, targetUid: string, n
     } catch (e: any) {
         console.error("Reset password failed:", e);
         return { success: false, error: e.message || "重設密碼失敗" };
+    }
+}
+
+/**
+ * Approve (or revoke) a user's access to content. Admin only.
+ */
+export async function setUserApprovedAction(idToken: string, targetUid: string, approved: boolean) {
+    await requireAdmin(idToken);
+
+    try {
+        await adminDb.doc(`users/${targetUid}`).set({ approved }, { merge: true });
+        revalidatePath("/admin/user-management");
+        return { success: true };
+    } catch (e: any) {
+        console.error("Set approval failed:", e);
+        return { success: false, error: e.message || "更新失敗" };
     }
 }

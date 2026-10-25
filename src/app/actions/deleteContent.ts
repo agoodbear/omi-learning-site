@@ -1,8 +1,11 @@
 "use server";
 
+import { requireAdmin } from "@/lib/auth/server";
+
 import { adminDb } from "@/lib/firebase/admin";
 
-export async function deleteCase(caseId: string) {
+export async function deleteCase(idToken: string, caseId: string) {
+    await requireAdmin(idToken);
     if (!caseId) throw new Error("Case ID required");
 
     try {
@@ -29,7 +32,8 @@ export async function deleteCase(caseId: string) {
     }
 }
 
-export async function deletePaper(paperId: string) {
+export async function deletePaper(idToken: string, paperId: string) {
+    await requireAdmin(idToken);
     if (!paperId) throw new Error("Paper ID required");
 
     try {

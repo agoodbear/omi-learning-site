@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { UserProfile } from "@/types/user";
-import { deleteUserAction, resetPasswordAction } from "@/app/actions/userManagement";
+import { deleteUserAction, resetPasswordAction, setUserApprovedAction } from "@/app/actions/userManagement";
 import { Trash2, KeyRound, Search, AlertTriangle, CheckCircle2 } from "lucide-react";
 
 export default function UserManagementPage() {
@@ -45,7 +45,7 @@ export default function UserManagementPage() {
 
         setActionLoading(targetUid);
         setFeedback(null);
-        const result = await deleteUserAction(user.uid, targetUid);
+        const result = await deleteUserAction(await user.getIdToken(), targetUid);
         setActionLoading(null);
 
         if (result.success) {
@@ -56,12 +56,28 @@ export default function UserManagementPage() {
         }
     };
 
+    const handleApproval = async (targetUid: string, employeeId: string, approved: boolean) => {
+        if (!user) return;
+
+        setActionLoading(targetUid);
+        setFeedback(null);
+        const result = await setUserApprovedAction(await user.getIdToken(), targetUid, approved);
+        setActionLoading(null);
+
+        if (result.success) {
+            setFeedback({ type: "success", message: `${employeeId} 已${approved ? "核准" : "取消核准"}` });
+            setUsers(prev => prev.map(u => u.uid === targetUid ? { ...u, approved } : u));
+        } else {
+            setFeedback({ type: "error", message: result.error || "更新失敗" });
+        }
+    };
+
     const handlePasswordReset = async () => {
         if (!user || !resetModal) return;
 
         setActionLoading(resetModal.uid);
         setFeedback(null);
-        const result = await resetPasswordAction(user.uid, resetModal.uid, newPassword);
+        const result = await resetPasswordAction(await user.getIdToken(), resetModal.uid, newPassword);
         setActionLoading(null);
 
         if (result.success) {
@@ -85,7 +101,7 @@ export default function UserManagementPage() {
     return (
         <div className="p-6 max-w-4xl mx-auto">
             <h1 className="text-2xl font-bold mb-2">人員管理</h1>
-            <p className="text-muted mb-6">管理員可在此刪除使用者或重設密碼。</p>
+            <p className="text-muted mb-6">管理員可在此核准新註冊的帳號、刪除使用者或重設密碼。</p>
 
             {/* Feedback */}
             {feedback && (
@@ -119,6 +135,7 @@ export default function UserManagementPage() {
                             <tr>
                                 <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">員工編號</th>
                                 <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">姓名</th>
+                                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">狀態</th>
                                 <th className="text-right px-4 py-3 text-sm font-semibold text-gray-600">操作</th>
                             </tr>
                         </thead>
@@ -127,8 +144,19 @@ export default function UserManagementPage() {
                                 <tr key={u.uid} className="border-b last:border-b-0 hover:bg-gray-50">
                                     <td className="px-4 py-3 font-medium">{u.employeeId}</td>
                                     <td className="px-4 py-3 text-gray-600">{u.displayName || "-"}</td>
+                                    <td className="px-4 py-3 text-sm">
+                                        {u.approved ? <span className="text-green-700">已核准</span> : <span className="text-amber-700">待核准</span>}
+                                    </td>
                                     <td className="px-4 py-3 text-right">
                                         <div className="flex items-center justify-end gap-2">
+                                            <button
+                                                onClick={() => handleApproval(u.uid, u.employeeId, !u.approved)}
+                                                disabled={actionLoading === u.uid}
+                                                className="px-3 py-1.5 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors disabled:opacity-50"
+                                            >
+                                                <CheckCircle2 size={14} className="inline mr-1" />
+                                                {u.approved ? "取消核准" : "核准"}
+                                            </button>
                                             <button
                                                 onClick={() => setResetModal({ uid: u.uid, employeeId: u.employeeId })}
                                                 disabled={actionLoading === u.uid}

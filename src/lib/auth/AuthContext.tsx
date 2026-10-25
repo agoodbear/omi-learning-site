@@ -14,6 +14,7 @@ interface AuthContextType {
     userProfile: UserProfile | null;
     loading: boolean;
     isAdminUser: boolean;
+    isApproved: boolean;
     signOut: () => Promise<void>;
 }
 
@@ -22,6 +23,7 @@ const AuthContext = createContext<AuthContextType>({
     userProfile: null,
     loading: true,
     isAdminUser: false,
+    isApproved: false,
     signOut: async () => { },
 });
 
@@ -52,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                 sessionStorage.setItem("session_logged", "true");
                                 // Fire-and-forget: don't await these to avoid blocking
                                 logEvent(firebaseUser.uid, "login", null, null, { employeeId }).catch(console.error);
-                                awardLoginPoints(firebaseUser.uid, employeeId).catch(console.error);
+                                firebaseUser.getIdToken().then(awardLoginPoints).catch(console.error);
                             }
 
                         } else {
@@ -70,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             if (typeof window !== "undefined" && !sessionStorage.getItem("session_logged")) {
                                 sessionStorage.setItem("session_logged", "true");
                                 logEvent(firebaseUser.uid, "login", null, null, { employeeId }).catch(console.error);
-                                awardLoginPoints(firebaseUser.uid, employeeId).catch(console.error);
+                                firebaseUser.getIdToken().then(awardLoginPoints).catch(console.error);
                             }
                         }
                     } catch (error) {
@@ -92,13 +94,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const isAdminUser = userProfile ? isAdmin(userProfile.employeeId) : false;
+    const isApproved = isAdminUser || userProfile?.approved === true;
 
     const signOut = async () => {
         await firebaseSignOut(auth);
     };
 
     return (
-        <AuthContext.Provider value={{ user, userProfile, loading, isAdminUser, signOut }}>
+        <AuthContext.Provider value={{ user, userProfile, loading, isAdminUser, isApproved, signOut }}>
             {children}
         </AuthContext.Provider>
     );

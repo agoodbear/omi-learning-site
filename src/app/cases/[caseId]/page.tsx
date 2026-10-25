@@ -50,10 +50,9 @@ export default function CaseDetailPage() {
     useEffect(() => {
         if (user && caseData && !hasLoggedView.current) {
             // Use Server Action to track read status & points
-            logView(user.uid, "case", caseData.id || (caseId as string), {
-                category: caseData.category,
-                title: caseData.title
-            });
+            const id = caseData.id || (caseId as string);
+            const meta = { category: caseData.category, title: caseData.title };
+            user.getIdToken().then(token => logView(token, "case", id, meta)).catch(console.error);
             hasLoggedView.current = true;
         }
     }, [user, caseData, caseId]);

@@ -1,5 +1,7 @@
 "use server";
 
+import { requireAdmin } from "@/lib/auth/server";
+
 import { adminDb } from "@/lib/firebase/admin";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { ClinicalEvent } from "@/types/firestore-schema";
@@ -19,8 +21,10 @@ function diffMinutes(end: Timestamp | null, start: Timestamp | null): number | n
     return Math.round(diffMs / 60000);
 }
 
-export async function importClinicalData(uid: string, rawEvents: any[]) {
-    if (!uid) throw new Error("Unauthorized");
+export async function importClinicalData(idToken: string, rawEvents: any[]) {
+    await requireAdmin(idToken);
+    // 臨床資料（病人層級）只在本機分析，不上傳到 Firebase。
+    throw new Error("已停用：臨床資料改在本機離線比對");
 
     // Verify Admin (Double check implementation or trust Middleware/Layout check)
     // For now we assume caller is checked, but we can check token again if context allowed.

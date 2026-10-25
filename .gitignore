@@ -42,3 +42,6 @@ next-env.d.ts
 
 # local tools
 service-account-key.json
+
+# firebase emulator logs
+*-debug.log

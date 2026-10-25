@@ -6,6 +6,7 @@ import { db } from "@/lib/firebase";
 import { deleteCase, deletePaper } from "@/app/actions/deleteContent";
 import { Loader2, Trash2, FileText, HeartPulse, ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { useAuth } from "@/lib/auth/AuthContext";
 
 type ItemType = "case" | "paper";
 
@@ -17,6 +18,7 @@ interface ContentItem {
 }
 
 export default function AdminContentPage() {
+    const { user } = useAuth();
     const [activeTab, setActiveTab] = useState<ItemType>("case");
     const [items, setItems] = useState<ContentItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -51,9 +53,9 @@ export default function AdminContentPage() {
         setProcessingId(id);
         try {
             if (activeTab === "case") {
-                await deleteCase(id);
+                await deleteCase(await user!.getIdToken(), id);
             } else {
-                await deletePaper(id);
+                await deletePaper(await user!.getIdToken(), id);
             }
             // Remove locally
             setItems(prev => prev.filter(item => item.id !== id));

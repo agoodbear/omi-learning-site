@@ -1,26 +1,30 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    
+
     function isAdmin() {
       // Hardcoded admin check for now, matching client-side config
       return request.auth != null && request.auth.token.email == '16022@omi.local';
     }
-    
-    // Cases images: Authenticated users can upload, Admin can delete
+
+    // Case images: logged-in users can upload de-identified ECG images (≤10MB, image only)
     match /cases/{caseId}/{allPaths=**} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      allow create: if request.auth != null &&
+        request.resource.size < 10 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.*');
+      allow update, delete: if isAdmin();
     }
-    
+
+    // Papers storage
+    match /papers/{paperId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
     // Default deny
     match /{allPaths=**} {
       allow read, write: if false;
-    }
-    // Papers storage
-    match /papers/{paperId}/{allPaths=**} {
-        allow read: if request.auth != null;
-        allow write: if isAdmin();
     }
   }
 }

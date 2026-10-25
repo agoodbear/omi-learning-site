@@ -6,7 +6,10 @@
     "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:rules": "firebase emulators:exec --only firestore --project omi-rules-test \"node --test tests/firestore.rules.test.mjs\"",
+    "test:actions": "firebase emulators:exec --only firestore,auth --project omi-rules-test \"node --conditions=react-server --import tsx --test tests/actions.test.mts\"",
+    "test": "npm run test:rules && npm run test:actions"
   },
   "dependencies": {
     "@react-pdf-viewer/core": "^3.12.0",
@@ -32,9 +35,11 @@
     "react-pdf-highlighter": "^8.0.0-rc.0",
     "react-resizable-panels": "^4.5.2",
     "recharts": "^3.7.0",
+    "server-only": "^0.0.1",
     "uuid": "^13.0.0"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@tailwindcss/postcss": "^4.1.18",
     "@tailwindcss/typography": "^0.5.19",
     "@types/node": "^25.0.10",
@@ -50,7 +55,7 @@
     "postcss": "^8.5.6",
     "sharp": "^0.34.5",
     "tailwindcss": "^4.1.18",
-    "tsx": "^4.21.0",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3"
   }
 }

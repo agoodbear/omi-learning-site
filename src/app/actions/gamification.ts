@@ -1,5 +1,11 @@
 "use server";
 
+import { requireApproved } from "@/lib/auth/server";
+
+function taipeiDate(d: Date): string {
+    return d.toLocaleDateString("en-CA", { timeZone: "Asia/Taipei" });
+}
+
 import { adminDb } from "@/lib/firebase/admin";
 import { FieldValue } from "firebase-admin/firestore";
 
@@ -21,12 +27,12 @@ type BadgeId = keyof typeof BADGE_DEFINITIONS;
  * Awards daily login points and tracks streak.
  * Should be called once on successful login.
  */
-export async function awardLoginPoints(uid: string, employeeId?: string) {
-    if (!uid) return { success: false, error: "No UID" };
+export async function awardLoginPoints(idToken: string) {
+    const { uid, employeeId } = await requireApproved(idToken);
 
     const pointsRef = adminDb.collection("pointsStats").doc(uid);
     const timestamp = FieldValue.serverTimestamp();
-    const today = new Date().toISOString().split("T")[0]; // "YYYY-MM-DD"
+    const today = taipeiDate(new Date()); // "YYYY-MM-DD"，以台灣日期算連續登入
 
     // Fetch current stats
     const doc = await pointsRef.get();
@@ -88,9 +94,7 @@ export async function awardLoginPoints(uid: string, employeeId?: string) {
         updatedAt: timestamp,
     };
 
-    if (employeeId) {
-        updateData.employeeId = employeeId;
-    }
+    updateData.employeeId = employeeId;
 
     if (bonusPoints > 0) {
         updateData["pointsBreakdown.bonusPoints"] = FieldValue.increment(bonusPoints);
@@ -106,7 +110,7 @@ export async function awardLoginPoints(uid: string, employeeId?: string) {
     const eventRef = adminDb.collection("events").doc();
     await eventRef.set({
         uid,
-        employeeId: employeeId || "UNKNOWN",
+        employeeId,
         action: "login",
         targetType: null,
         targetId: null,
@@ -125,18 +129,4 @@ export async function awardLoginPoints(uid: string, employeeId?: string) {
         newStreak,
         newBadges,
     };
-}
-
-/**
- * Award a specific badge to a user.
- */
-export async function awardBadge(uid: string, badgeId: BadgeId) {
-    const pointsRef = adminDb.collection("pointsStats").doc(uid);
-
-    await pointsRef.set({
-        badges: FieldValue.arrayUnion(badgeId),
-        updatedAt: FieldValue.serverTimestamp(),
-    }, { merge: true });
-
-    return { success: true, badge: badgeId };
 }
