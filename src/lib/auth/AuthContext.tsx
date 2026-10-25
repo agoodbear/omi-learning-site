@@ -7,6 +7,7 @@ import { auth, db } from "@/lib/firebase/config";
 import { emailToEmployeeId, isAdmin } from "./utils";
 import { UserProfile } from "@/types/user";
 import { logEvent } from "@/lib/events";
+import { awardLoginPoints } from "@/app/actions/gamification";
 
 interface AuthContextType {
     user: User | null;
@@ -46,11 +47,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             await setDoc(userRef, { lastLoginAt: serverTimestamp() }, { merge: true });
                             setUserProfile(docSnap.data() as UserProfile);
 
-                            // Log Login Event (Once per session)
+                            // Award Login Points & Log Event (Once per session, fire-and-forget)
                             if (typeof window !== "undefined" && !sessionStorage.getItem("session_logged")) {
-                                // We don't await this to avoid blocking UI
-                                logEvent(firebaseUser.uid, "login", null, null, { employeeId });
                                 sessionStorage.setItem("session_logged", "true");
+                                // Fire-and-forget: don't await these to avoid blocking
+                                logEvent(firebaseUser.uid, "login", null, null, { employeeId }).catch(console.error);
+                                awardLoginPoints(firebaseUser.uid, employeeId).catch(console.error);
                             }
 
                         } else {
@@ -61,14 +63,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                 createdAt: serverTimestamp(),
                                 lastLoginAt: serverTimestamp(),
                             };
-                            // @ts-expect-error - serverTimestamp is compatible in practice
                             await setDoc(userRef, newProfile);
                             setUserProfile(newProfile as unknown as UserProfile);
 
-                            // Log Login Event for new user
+                            // Award Login Points & Log Event for new user (fire-and-forget)
                             if (typeof window !== "undefined" && !sessionStorage.getItem("session_logged")) {
-                                logEvent(firebaseUser.uid, "login", null, null, { employeeId });
                                 sessionStorage.setItem("session_logged", "true");
+                                logEvent(firebaseUser.uid, "login", null, null, { employeeId }).catch(console.error);
+                                awardLoginPoints(firebaseUser.uid, employeeId).catch(console.error);
                             }
                         }
                     } catch (error) {

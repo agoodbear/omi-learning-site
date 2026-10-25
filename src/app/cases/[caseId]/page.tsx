@@ -152,6 +152,11 @@ export default function CaseDetailPage() {
 
                         <div className="bg-gray-50 p-3 text-center text-xs text-muted border-t border-border">
                             Click image to enlarge • Standard 12-Lead ECG
+                            {caseData.submittedBy && (
+                                <span className="block mt-1 text-primary font-medium">
+                                    📷 Courtesy by {caseData.submittedBy.employeeId}
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -159,105 +164,116 @@ export default function CaseDetailPage() {
                 {/* Right Column: Question & Interaction */}
                 <div className="lg:col-span-1">
                     <div className="sticky top-8 space-y-6">
-                        <div className="card p-6">
-                            <h2 className="text-sm font-semibold text-primary uppercase tracking-wide mb-4">
-                                Diagnostic Question
-                            </h2>
+                        {caseData.question && caseData.choices ? (
+                            <div className="card p-6">
+                                <h2 className="text-sm font-semibold text-primary uppercase tracking-wide mb-4">
+                                    Diagnostic Question
+                                </h2>
 
-                            <p className="font-medium text-foreground text-lg mb-6 leading-snug">{caseData.question}</p>
+                                <p className="font-medium text-foreground text-lg mb-6 leading-snug">{caseData.question}</p>
 
-                            <div className="space-y-3 mb-6">
-                                {caseData.choices.map((choice, idx) => {
-                                    let stateStyle = "border-border bg-white text-foreground hover:border-primary hover:bg-gray-50";
+                                <div className="space-y-3 mb-6">
+                                    {caseData.choices.map((choice, idx) => {
+                                        let stateStyle = "border-border bg-white text-foreground hover:border-primary hover:bg-gray-50";
 
-                                    if (isSubmitted) {
-                                        if (idx === caseData.correct_answer) {
-                                            stateStyle = "border-success bg-green-50 text-green-800";
-                                        } else if (idx === selectedChoice && idx !== caseData.correct_answer) {
-                                            stateStyle = "border-alert-red bg-red-50 text-red-800";
-                                        } else {
-                                            stateStyle = "border-border bg-gray-50 text-muted opacity-60";
+                                        if (isSubmitted) {
+                                            if (idx === caseData.correct_answer) {
+                                                stateStyle = "border-success bg-green-50 text-green-800";
+                                            } else if (idx === selectedChoice && idx !== caseData.correct_answer) {
+                                                stateStyle = "border-alert-red bg-red-50 text-red-800";
+                                            } else {
+                                                stateStyle = "border-border bg-gray-50 text-muted opacity-60";
+                                            }
+                                        } else if (selectedChoice === idx) {
+                                            stateStyle = "border-primary bg-primary/5 text-foreground";
                                         }
-                                    } else if (selectedChoice === idx) {
-                                        stateStyle = "border-primary bg-primary/5 text-foreground";
-                                    }
 
-                                    return (
-                                        <button
-                                            key={idx}
-                                            onClick={() => !isSubmitted && setSelectedChoice(idx)}
-                                            disabled={isSubmitted}
-                                            className={`w-full text-left p-4 rounded-lg border transition-all text-sm flex items-start gap-3 cursor-pointer ${stateStyle}`}
-                                        >
-                                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5
+                                        return (
+                                            <button
+                                                key={idx}
+                                                onClick={() => !isSubmitted && setSelectedChoice(idx)}
+                                                disabled={isSubmitted}
+                                                className={`w-full text-left p-4 rounded-lg border transition-all text-sm flex items-start gap-3 cursor-pointer ${stateStyle}`}
+                                            >
+                                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5
                                             ${isSubmitted && idx === caseData.correct_answer ? 'border-success bg-success' :
-                                                    isSubmitted && idx === selectedChoice ? 'border-alert-red bg-alert-red' :
-                                                        selectedChoice === idx ? 'border-primary' : 'border-gray-300'}`}>
-                                                {selectedChoice === idx && !isSubmitted && <div className="w-2.5 h-2.5 rounded-full bg-primary"></div>}
-                                                {isSubmitted && idx === caseData.correct_answer && <CheckCircle size={12} className="text-white" />}
-                                                {isSubmitted && idx === selectedChoice && idx !== caseData.correct_answer && <XCircle size={12} className="text-white" />}
-                                            </div>
-                                            <span>{choice}</span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-
-                            {!isSubmitted ? (
-                                <button
-                                    onClick={handleSubmit}
-                                    disabled={selectedChoice === null}
-                                    className={`w-full py-3 rounded-lg font-semibold transition-all cursor-pointer
-                                    ${selectedChoice !== null
-                                            ? "btn-primary"
-                                            : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}
-                                >
-                                    Submit Answer
-                                </button>
-                            ) : (
-                                <div className={`p-5 rounded-lg border ${isCorrect ? 'border-success bg-green-50' : 'border-alert-red bg-red-50'}`}>
-                                    <div className="flex items-center gap-2 mb-3 font-semibold">
-                                        {isCorrect ? (
-                                            <><CheckCircle className="text-success" size={20} /> <span className="text-green-800">Correct!</span></>
-                                        ) : (
-                                            <><XCircle className="text-alert-red" size={20} /> <span className="text-red-800">Incorrect</span></>
-                                        )}
-                                    </div>
-
-                                    {/* Reveal Category Here */}
-                                    <div className="mb-4">
-                                        <span className={`text-xs font-semibold px-2 py-1 rounded border ${caseData.category === "OMI" ? "bg-red-100 text-red-800 border-red-200" :
-                                            caseData.category === "STEMI_mimics" ? "bg-yellow-100 text-yellow-800 border-yellow-200" :
-                                                "bg-blue-100 text-blue-800 border-blue-200"
-                                            }`}>
-                                            Category: {caseData.category === "STEMI_mimics" ? "STEMI Mimic" : caseData.category}
-                                        </span>
-                                    </div>
-
-                                    <p className="text-sm text-foreground leading-relaxed mb-4">
-                                        {caseData.explanation}
-                                    </p>
-
-                                    <div className="pt-4 border-t border-gray-200">
-                                        <p className="text-xs text-muted uppercase tracking-wide mb-2 flex items-center gap-1">
-                                            <BookOpen size={12} /> References
-                                        </p>
-                                        <ul className="list-disc pl-4 text-xs text-muted space-y-1">
-                                            {caseData.references.map((ref, i) => (
-                                                <li key={i}>{ref}</li>
-                                            ))}
-                                        </ul>
-                                    </div>
+                                                        isSubmitted && idx === selectedChoice ? 'border-alert-red bg-alert-red' :
+                                                            selectedChoice === idx ? 'border-primary' : 'border-gray-300'}`}>
+                                                    {selectedChoice === idx && !isSubmitted && <div className="w-2.5 h-2.5 rounded-full bg-primary"></div>}
+                                                    {isSubmitted && idx === caseData.correct_answer && <CheckCircle size={12} className="text-white" />}
+                                                    {isSubmitted && idx === selectedChoice && idx !== caseData.correct_answer && <XCircle size={12} className="text-white" />}
+                                                </div>
+                                                <span>{choice}</span>
+                                            </button>
+                                        );
+                                    })}
                                 </div>
-                            )}
-                        </div>
+
+                                {!isSubmitted ? (
+                                    <button
+                                        onClick={handleSubmit}
+                                        disabled={selectedChoice === null}
+                                        className={`w-full py-3 rounded-lg font-semibold transition-all cursor-pointer
+                                    ${selectedChoice !== null
+                                                ? "btn-primary"
+                                                : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}
+                                    >
+                                        Submit Answer
+                                    </button>
+                                ) : (
+                                    <div className={`p-5 rounded-lg border ${isCorrect ? 'border-success bg-green-50' : 'border-alert-red bg-red-50'}`}>
+                                        <div className="flex items-center gap-2 mb-3 font-semibold">
+                                            {isCorrect ? (
+                                                <><CheckCircle className="text-success" size={20} /> <span className="text-green-800">Correct!</span></>
+                                            ) : (
+                                                <><XCircle className="text-alert-red" size={20} /> <span className="text-red-800">Incorrect</span></>
+                                            )}
+                                        </div>
+
+                                        {/* Reveal Category Here */}
+                                        <div className="mb-4">
+                                            <span className={`text-xs font-semibold px-2 py-1 rounded border ${caseData.category === "OMI" ? "bg-red-100 text-red-800 border-red-200" :
+                                                caseData.category === "STEMI_mimics" ? "bg-yellow-100 text-yellow-800 border-yellow-200" :
+                                                    "bg-blue-100 text-blue-800 border-blue-200"
+                                                }`}>
+                                                Category: {caseData.category === "STEMI_mimics" ? "STEMI Mimic" : caseData.category}
+                                            </span>
+                                        </div>
+
+                                        <p className="text-sm text-foreground leading-relaxed mb-4">
+                                            {caseData.explanation}
+                                        </p>
+
+                                        <div className="pt-4 border-t border-gray-200">
+                                            <p className="text-xs text-muted uppercase tracking-wide mb-2 flex items-center gap-1">
+                                                <BookOpen size={12} /> References
+                                            </p>
+                                            <ul className="list-disc pl-4 text-xs text-muted space-y-1">
+                                                {caseData.references.map((ref, i) => (
+                                                    <li key={i}>{ref}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="card p-6">
+                                <h2 className="text-sm font-semibold text-primary uppercase tracking-wide mb-4">
+                                    Discussion Case
+                                </h2>
+                                <p className="text-muted text-sm">
+                                    此案例為討論用途，無測驗題目。請使用下方留言區參與討論！
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </section>
 
             {/* Comments Section */}
             <div className="mt-12 max-w-4xl mx-auto">
-                <CommentsSection caseId={caseData.id!} />
+                <CommentsSection resourceId={caseData.id!} />
             </div>
 
             {/* Modal for Zoom */}

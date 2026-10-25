@@ -12,6 +12,7 @@ import dynamic from "next/dynamic";
 import { logEvent } from "@/lib/events";
 import { logView } from "@/app/actions/logView";
 import TipTapEditor from "@/components/content/TipTapEditor";
+import CommentsSection from "@/components/CommentsSection";
 import type { HighlightArea } from "@/components/pdf/PDFReader";
 
 // Dynamically import PDFReader to avoid SSR issues
@@ -192,6 +193,13 @@ export default function LiteratureDetailPage() {
             hasLoggedView.current = true;
         }
     }, [user, paper]);
+    // Lock body scroll to prevent double scrollbars
+    useEffect(() => {
+        document.body.style.overflow = "hidden";
+        return () => {
+            document.body.style.overflow = "";
+        };
+    }, []);
 
     if (authLoading || loading) return <div className="p-8 text-center text-muted">Loading Paper...</div>;
 
@@ -239,7 +247,7 @@ export default function LiteratureDetailPage() {
     });
 
     return (
-        <div className="min-h-screen bg-background flex flex-col h-screen overflow-hidden">
+        <div className="flex flex-col h-[calc(100vh-57px)] overflow-hidden bg-background">
             {/* Header */}
             <header className="bg-white border-b border-border p-4 flex items-center justify-between shrink-0 z-20">
                 <div className="flex items-center gap-4">
@@ -257,7 +265,7 @@ export default function LiteratureDetailPage() {
             </header>
 
             {/* Main Layout */}
-            <div className="flex-1 flex overflow-hidden relative" ref={containerRef}>
+            <div className="flex-1 flex overflow-hidden relative min-h-0" ref={containerRef}>
 
                 {/* Arrow Overlay */}
                 <svg className="absolute inset-0 z-50 pointer-events-none w-full h-full overflow-visible">
@@ -284,14 +292,21 @@ export default function LiteratureDetailPage() {
 
                 {/* PDF Viewer */}
                 {/* PDF Viewer - Flex 1 to take remaining space */}
-                <div className="flex-1 bg-gray-100 p-4 overflow-auto relative min-w-0">
+                <div className="flex-1 bg-gray-100 p-4 overflow-auto relative min-w-0 h-full">
                     {paper.pdf?.downloadURL ? (
-                        <PDFReader
-                            ref={pdfReaderRef} // Attach ref
-                            url={paper.pdf.downloadURL}
-                            highlights={viewerHighlights}
-                            readOnly={true}
-                        />
+                        <>
+                            <PDFReader
+                                ref={pdfReaderRef} // Attach ref
+                                url={paper.pdf.downloadURL}
+                                highlights={viewerHighlights}
+                                readOnly={true}
+                            />
+
+                            {/* Discussion Section */}
+                            <div className="max-w-4xl mx-auto mt-8 mb-12" id="comments-section">
+                                <CommentsSection resourceId={paper.id!} />
+                            </div>
+                        </>
                     ) : (
                         <div className="text-center p-12 text-muted">Unable to load PDF.</div>
                     )}
@@ -311,15 +326,15 @@ export default function LiteratureDetailPage() {
                 {/* Highlights Sidebar (Resizable) */}
                 {highlights.length > 0 && (
                     <div
-                        className="bg-white border-l border-border flex flex-col shrink-0"
+                        className="bg-white border-l border-border flex flex-col shrink-0 overflow-hidden h-full"
                         style={{ width: sidebarWidth }}
                     >
-                        <div className="p-4 border-b border-border font-semibold text-sm text-gray-700 bg-gray-50 flex items-center gap-2">
+                        <div className="p-4 border-b border-border font-semibold text-sm text-gray-700 bg-gray-50 flex items-center gap-2 shrink-0">
                             <Quote size={16} />
                             <span>Highlights</span>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
                             {highlights.map(h => (
                                 <div
                                     key={h.id}

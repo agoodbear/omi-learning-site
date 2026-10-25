@@ -168,10 +168,10 @@ export default function AdminDashboard() {
                         </div>
                     </div>
 
-                    {/* Content Management */}
+                    {/* Data Management */}
                     <div className="card p-6">
-                        <h2 className="text-lg font-semibold text-foreground mb-4">內容管理</h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <h2 className="text-lg font-semibold text-foreground mb-4">資料管理</h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <Link href="/admin/content" className="flex items-center gap-3 p-4 rounded-lg border border-border hover:border-primary hover:bg-gray-50 transition-all">
                                 <div className="p-3 bg-red-50 text-red-600 rounded-md"><Trash2 size={20} /></div>
                                 <div>
@@ -179,7 +179,13 @@ export default function AdminDashboard() {
                                     <div className="text-xs text-muted">刪除案例與文獻</div>
                                 </div>
                             </Link>
-                            {/* Placeholder for Edit/Create in future */}
+                            <Link href="/admin/user-management" className="flex items-center gap-3 p-4 rounded-lg border border-border hover:border-primary hover:bg-gray-50 transition-all">
+                                <div className="p-3 bg-orange-50 text-orange-600 rounded-md"><Users size={20} /></div>
+                                <div>
+                                    <div className="font-medium text-foreground">人員管理</div>
+                                    <div className="text-xs text-muted">刪除帳號或重設密碼</div>
+                                </div>
+                            </Link>
                         </div>
                     </div>
                 </div>

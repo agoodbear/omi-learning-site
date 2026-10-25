@@ -21,23 +21,23 @@ import { Send, MessageSquare, ThumbsUp, Heart, Flame, Smile } from "lucide-react
 import { formatDistanceToNow } from "date-fns";
 
 interface CommentsSectionProps {
-    caseId: string;
+    resourceId: string;
 }
 
 const EMOJI_OPTIONS = ["👍", "❤️", "🔥", "😮"];
 
-export default function CommentsSection({ caseId }: CommentsSectionProps) {
+export default function CommentsSection({ resourceId }: CommentsSectionProps) {
     const { user, userProfile } = useAuth();
     const [comments, setComments] = useState<Comment[]>([]);
     const [newComment, setNewComment] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
-        if (!caseId) return;
+        if (!resourceId) return;
 
         const q = query(
             collection(db, "comments"),
-            where("caseId", "==", caseId),
+            where("caseId", "==", resourceId),
             orderBy("createdAt", "desc")
         );
 
@@ -50,7 +50,7 @@ export default function CommentsSection({ caseId }: CommentsSectionProps) {
         });
 
         return () => unsubscribe();
-    }, [caseId]);
+    }, [resourceId]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -59,7 +59,7 @@ export default function CommentsSection({ caseId }: CommentsSectionProps) {
         setIsSubmitting(true);
         try {
             await addDoc(collection(db, "comments"), {
-                caseId,
+                caseId: resourceId,
                 userId: user.uid,
                 userEmail: userProfile.employeeId, // Using employee ID as display name
                 content: newComment.trim(),
@@ -129,7 +129,7 @@ export default function CommentsSection({ caseId }: CommentsSectionProps) {
                             <textarea
                                 value={newComment}
                                 onChange={(e) => setNewComment(e.target.value)}
-                                placeholder="分享您對這張心電圖的想法或是提問..."
+                                placeholder="分享您的想法或是提問..."
                                 className="w-full p-3 border border-border rounded-lg focus:outline-none focus:border-primary min-h-[100px] resize-y mb-2 bg-white"
                             />
                             <div className="flex justify-end">

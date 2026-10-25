@@ -8,9 +8,6 @@ const nextConfig: NextConfig = {
     config.resolve.alias.encoding = false;
     return config;
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   typescript: {
     ignoreBuildErrors: true,
   },

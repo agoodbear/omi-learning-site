@@ -22,8 +22,12 @@ service cloud.firestore {
     
     // --- Core Content ---
     match /cases/{caseId} {
+      // Published cases readable by all logged-in users; pending/draft only by admin
       allow read: if isAdmin() || (isLoggedIn() && resource.data.status == 'published');
-      allow create, update, delete: if isAdmin();
+      // Allow logged-in users to create cases with 'pending' status (user submissions)
+      allow create: if isLoggedIn() && request.resource.data.status == 'pending';
+      // Admin has full update/delete rights
+      allow update, delete: if isAdmin();
     }
     
     match /papers/{paperId} {

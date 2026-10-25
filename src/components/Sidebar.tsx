@@ -6,7 +6,8 @@ import { useAuth } from "@/lib/auth/AuthContext";
 import { db } from "@/lib/firebase";
 import { doc, onSnapshot, collection, query, where, getCountFromServer, orderBy, limit } from "firebase/firestore";
 import { PointsStats, UserContentStatus } from "@/types/firestore-schema";
-import { Trophy, BookOpen, Brain, Activity, Star, LayoutDashboard, FileText, Trash2 } from "lucide-react";
+import { getDesignation } from "@/lib/auth/utils";
+import { Trophy, BookOpen, Brain, Activity, Star, LayoutDashboard, FileText, Trash2, Users, Plus } from "lucide-react";
 
 export default function Sidebar() {
     const { user, userProfile, isAdminUser } = useAuth();
@@ -16,21 +17,27 @@ export default function Sidebar() {
     const [rank, setRank] = useState<number | null>(null);
     const [unreadCases, setUnreadCases] = useState<number>(0);
     const [unreadPapers, setUnreadPapers] = useState<number>(0);
+    const [currentStreak, setCurrentStreak] = useState<number>(0);
+    const [badges, setBadges] = useState<string[]>([]);
 
     // Listeners
     useEffect(() => {
         if (!user) return;
 
-        // 1. Points Listener
+        // 1. Points & Gamification Listener
         const pointsRef = doc(db, "pointsStats", user.uid);
         const unsubPoints = onSnapshot(pointsRef, (docSnap) => {
             if (docSnap.exists()) {
                 const data = docSnap.data() as PointsStats;
-                setPoints(data.totalPoints);
+                setPoints(data.totalPoints || 0);
+                setCurrentStreak(data.currentStreak || 0);
+                setBadges(data.badges || []);
                 // Trigger rank update when points change
                 fetchRank(data.totalPoints);
             } else {
                 setPoints(0);
+                setCurrentStreak(0);
+                setBadges([]);
                 setRank(null);
             }
         });
@@ -98,7 +105,7 @@ export default function Sidebar() {
                         <Activity size={32} className="text-primary" />
                     </div>
                     <h3 className="font-bold text-foreground truncate">{userProfile?.employeeId || "User"}</h3>
-                    <p className="text-xs text-muted">Cardiology Fellow</p>
+                    <p className="text-xs text-primary font-medium">{getDesignation(points)}</p>
                 </div>
 
                 {/* Score Card */}
@@ -113,9 +120,25 @@ export default function Sidebar() {
                         <span className="text-xs text-muted mb-1">pts</span>
                     </div>
 
-                    <div className="text-xs text-muted font-medium flex items-center gap-1">
-                        Rank: <span className="text-foreground font-bold">#{rank ?? "-"}</span>
+                    <div className="flex justify-between text-xs text-muted font-medium mb-2">
+                        <span>Rank: <span className="text-foreground font-bold">#{rank ?? "-"}</span></span>
+                        <span>🔥 <span className="text-foreground font-bold">{currentStreak}</span> 天連續</span>
                     </div>
+
+                    {/* Badges */}
+                    {badges.length > 0 && (
+                        <div className="pt-2 border-t border-primary/10">
+                            <div className="flex flex-wrap gap-1">
+                                {badges.includes("streak_7") && <span title="週週精進" className="text-sm">🏅</span>}
+                                {badges.includes("streak_30") && <span title="學習達人" className="text-sm">🏆</span>}
+                                {badges.includes("first_quiz") && <span title="初試身手" className="text-sm">🎯</span>}
+                                {badges.includes("first_case") && <span title="探索者" className="text-sm">📖</span>}
+                                {badges.includes("perfect_quiz") && <span title="滿分王" className="text-sm">💯</span>}
+                                {badges.includes("quiz_10") && <span title="勤學不倦" className="text-sm">📚</span>}
+                                {badges.includes("quiz_50") && <span title="Quiz大師" className="text-sm">🧠</span>}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Admin Console (Visible only to Admins) */}
@@ -155,7 +178,16 @@ export default function Sidebar() {
                                 <div className="p-2 bg-red-50 text-red-600 rounded-md group-hover:bg-red-100 transition-colors">
                                     <Trash2 size={18} />
                                 </div>
-                                <span className="text-sm font-medium text-gray-700">內容刪除</span>
+                                <span className="text-sm font-medium text-gray-700">刪除內容</span>
+                            </div>
+                        </Link>
+
+                        <Link href="/admin/user-management" className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-all group">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-orange-50 text-orange-600 rounded-md group-hover:bg-orange-100 transition-colors">
+                                    <Users size={18} />
+                                </div>
+                                <span className="text-sm font-medium text-gray-700">人員管理</span>
                             </div>
                         </Link>
                     </div>
@@ -179,6 +211,15 @@ export default function Sidebar() {
                         ) : (
                             <div className="text-success"><Star size={14} fill="currentColor" /></div>
                         )}
+                    </Link>
+
+                    <Link href="/cases/submit" className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-all group">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-green-50 text-green-600 rounded-md group-hover:bg-green-100 transition-colors">
+                                <Plus size={18} />
+                            </div>
+                            <span className="text-sm font-medium text-gray-700">提交案例</span>
+                        </div>
                     </Link>
 
                     <Link href="/literature" className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-200 transition-all group">

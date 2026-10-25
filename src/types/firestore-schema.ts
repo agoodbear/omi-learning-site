@@ -1,7 +1,7 @@
 import { Timestamp } from "firebase/firestore";
 
 export type CaseCategory = "OMI" | "STEMI_mimics" | "Electrolyte";
-export type CaseStatus = "published" | "draft" | "archived";
+export type CaseStatus = "published" | "draft" | "archived" | "pending";
 
 export interface Case {
     id?: string; // Document ID
@@ -15,6 +15,7 @@ export interface Case {
     correct_answer: number; // Index of correct choice
     explanation: string;
     references: string[];
+    submittedBy?: { uid: string; employeeId: string }; // For user submissions
     createdAt: Timestamp;
     updatedAt: Timestamp;
 }
@@ -232,5 +233,12 @@ export interface PointsStats {
         quizPoints: number;
         bonusPoints: number;
     };
+    // Streak tracking
+    currentStreak: number;
+    longestStreak: number;
+    lastLoginDate?: string; // "YYYY-MM-DD" format
+    // Achievement badges
+    badges: string[]; // e.g. ["first_quiz", "streak_7", "quiz_master"]
     updatedAt: Timestamp;
 }
+

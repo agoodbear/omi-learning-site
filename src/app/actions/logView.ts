@@ -50,21 +50,29 @@ export async function logView(uid: string, type: "case" | "paper", id: string, m
     const data = statusSnap.data() || {};
     const list = type === "case" ? (data.casesRead || []) : (data.papersRead || []);
 
-    if (!list.includes(id)) {
-        // It's a new read! Award point.
-        const pointsRef = adminDb.collection("pointsStats").doc(uid);
-        batch.set(pointsRef, {
-            uid,
-            totalPoints: FieldValue.increment(1),
-            pointsBreakdown: {
-                // Assuming we want to track these points. 
-                // Maybe "contentPoints"? Simple totalPoints is required.
-                contentPoints: FieldValue.increment(1)
-            },
-            updatedAt: timestamp
-        }, { merge: true });
+    const isFirstView = !list.includes(id);
+    const pointsToAward = isFirstView ? 5 : 1; // First view +5, repeat +1
+    const breakdownField = type === "case" ? "casePoints" : "paperPoints";
+
+    const pointsRef = adminDb.collection("pointsStats").doc(uid);
+
+    // Award first_case badge on first ever case view
+    const badgeToAward = isFirstView && type === "case" && list.length === 0 ? "first_case" : null;
+
+    const updateData: any = {
+        uid,
+        totalPoints: FieldValue.increment(pointsToAward),
+        [`pointsBreakdown.${breakdownField}`]: FieldValue.increment(pointsToAward),
+        updatedAt: timestamp
+    };
+
+    if (badgeToAward) {
+        updateData.badges = FieldValue.arrayUnion(badgeToAward);
     }
 
+    batch.set(pointsRef, updateData, { merge: true });
+
     await batch.commit();
-    return { success: true };
+    return { success: true, isFirstView, pointsAwarded: pointsToAward, badgeAwarded: badgeToAward };
 }
+

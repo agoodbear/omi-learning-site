@@ -26,10 +26,10 @@ export async function submitQuizAttempt(uid: string, attemptData: Omit<QuizAttem
     batch.set(attemptRef, finalAttemptData);
 
     // 2. Calculate Points
-    // Rule: Finish Quiz (+3), Perfect Score (+2), Correct Answer (+1 per question)
+    // Rule: Finish Quiz (+3), Perfect Score (+10), Correct Answer (+1 per question)
     const POINTS_FINISH = 3;
     const POINTS_PER_CORRECT = 1;
-    const POINTS_PERFECT_BONUS = 2;
+    const POINTS_PERFECT_BONUS = 10;
 
     let pointsEarned = POINTS_FINISH;
     pointsEarned += (attemptData.correct * POINTS_PER_CORRECT);
@@ -83,16 +83,52 @@ export async function submitQuizAttempt(uid: string, attemptData: Omit<QuizAttem
         }, { merge: true });
     }
 
-    // 5. Update Points Stats (Gamification)
+    // 5. Update Points Stats (Gamification) with Badges
     const pointsRef = adminDb.collection("pointsStats").doc(uid);
-    batch.set(pointsRef, {
+
+    // Fetch current stats for badge calculation
+    const pointsDoc = await pointsRef.get();
+    const currentPointsData = pointsDoc.data() || {};
+    const currentBadges: string[] = currentPointsData.badges || [];
+
+    // Determine badges to award
+    const badgesToAward: string[] = [];
+
+    // First quiz badge
+    const contentStatusSnap = await adminDb.collection("userContentStatus").doc(uid).get();
+    const quizzesCompleted = contentStatusSnap.data()?.quizzesCompleted?.length || 0;
+    if (quizzesCompleted === 0 && !currentBadges.includes("first_quiz")) {
+        badgesToAward.push("first_quiz");
+    }
+
+    // Perfect score badge
+    const isPerfect = attemptData.correct === attemptData.total && attemptData.total > 0;
+    if (isPerfect && !currentBadges.includes("perfect_quiz")) {
+        badgesToAward.push("perfect_quiz");
+    }
+
+    // Quiz milestone badges (10, 50)
+    const newQuizCount = quizzesCompleted + 1;
+    if (newQuizCount >= 10 && !currentBadges.includes("quiz_10")) {
+        badgesToAward.push("quiz_10");
+    }
+    if (newQuizCount >= 50 && !currentBadges.includes("quiz_50")) {
+        badgesToAward.push("quiz_50");
+    }
+
+    const pointsUpdateData: any = {
         uid,
         totalPoints: FieldValue.increment(pointsEarned),
-        pointsBreakdown: {
-            quizPoints: FieldValue.increment(pointsEarned) // Bundling all quiz-related points here
-        },
+        "pointsBreakdown.quizPoints": FieldValue.increment(pointsEarned),
         updatedAt: timestamp
-    }, { merge: true });
+    };
+
+    if (badgesToAward.length > 0) {
+        pointsUpdateData.badges = FieldValue.arrayUnion(...badgesToAward);
+    }
+
+    batch.set(pointsRef, pointsUpdateData, { merge: true });
+
 
     // Also update Leaderboard (redundant if using pointsStats directly, but if we have a separate collection)
     // Req says "leaderboard (derived from pointsStats)". So no need to write to separate collection.

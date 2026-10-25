@@ -82,6 +82,7 @@ export default function CasesPage() {
                             value={categoryFilter}
                             onChange={(e) => setCategoryFilter(e.target.value as CaseCategory | "All")}
                             className="bg-white border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary cursor-pointer min-w-[150px]"
+                            suppressHydrationWarning
                         >
                             <option value="All">All Categories</option>
                             <option value="OMI">OMI</option>

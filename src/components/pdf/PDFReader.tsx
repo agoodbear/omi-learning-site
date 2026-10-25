@@ -5,7 +5,7 @@ import { Viewer, Worker, SpecialZoomLevel } from "@react-pdf-viewer/core";
 import { highlightPlugin, RenderHighlightTargetProps, RenderHighlightsProps, RenderHighlightContentProps } from "@react-pdf-viewer/highlight";
 import { toolbarPlugin } from "@react-pdf-viewer/toolbar";
 import { searchPlugin } from "@react-pdf-viewer/search";
-import { Trash2, Plus, GripVertical, Type, Image as ImageIcon, Check, MousePointer2, ChevronLeft, ChevronRight, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, Pen, Crop, Eye, EyeOff, Maximize, Search as SearchIcon } from 'lucide-react';
+import { Trash2, Plus, GripVertical, Type, Image as ImageIcon, Check, MousePointer2, ChevronLeft, ChevronRight, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, Pen, Crop, Eye, EyeOff, Maximize, Search as SearchIcon, MessageSquareText } from 'lucide-react';
 import html2canvas from "html2canvas";
 
 // Styles
@@ -456,14 +456,24 @@ const PDFReader = forwardRef<PDFReaderRef, PDFReaderProps>(({
         scrollToHighlight: (id: string) => {
             const highlight = highlights.find(h => h.id === id);
             if (highlight && highlight.areas && highlight.areas.length > 0) {
+                // 1. Trigger plugin jump (handles page switching if virtualized)
                 jumpToHighlightArea(highlight.areas[0]);
+
+                // 2. Manual DOM scroll as fallback/enforcer for custom layout
+                // Small delay to ensure render updates if page switch occurred
+                setTimeout(() => {
+                    const element = document.getElementById(`highlight-${id}`);
+                    if (element) {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }, 100);
             }
         }
     }));
 
     return (
         <div
-            className="h-[80vh] flex flex-col bg-gray-100 rounded-xl overflow-hidden border border-border relative"
+            className="w-full bg-gray-100 rounded-xl border border-border relative flex flex-col"
             ref={snapshotRef}
             onMouseDown={handleSnapshotMouseDown}
             onMouseMove={handleSnapshotMouseMove}
@@ -487,7 +497,7 @@ const PDFReader = forwardRef<PDFReaderRef, PDFReaderProps>(({
             )}
 
             {/* Enhanced Toolbar */}
-            <div className="bg-white border-b border-border p-2 flex items-center justify-between px-4 shrink-0 shadow-sm z-20">
+            <div className="bg-white border-b border-border p-2 flex items-center justify-between px-4 shrink-0 shadow-sm z-20 sticky top-0">
                 <div className="flex items-center gap-1">
                     {/* 1. Auto Highlight (Pen) */}
                     <button
@@ -622,6 +632,19 @@ const PDFReader = forwardRef<PDFReaderRef, PDFReaderProps>(({
                                             </button>
                                         )}
                                     </GoToNextPage>
+
+                                    <div className="h-6 w-px bg-gray-200 mx-1" />
+
+                                    <button
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-primary hover:bg-primary/10 transition-colors text-sm font-medium"
+                                        onClick={() => {
+                                            document.getElementById('comments-section')?.scrollIntoView({ behavior: 'smooth' });
+                                        }}
+                                        title="Go to Comments"
+                                    >
+                                        <MessageSquareText size={16} />
+                                        <span className="hidden sm:inline">Comments</span>
+                                    </button>
                                 </div>
                             );
                         }}
@@ -631,7 +654,7 @@ const PDFReader = forwardRef<PDFReaderRef, PDFReaderProps>(({
 
                 {/* 8. Search (SearchPlugin) */}
                 <div className="flex items-center relative custom-search-container">
-                    {/* Global Style Override for Search Popover */}
+                    {/* Global Style Override for Search Popover AND Page Input */}
                     <style jsx global>{`
                         .rpv-search__popover {
                             position: absolute !important;
@@ -648,13 +671,21 @@ const PDFReader = forwardRef<PDFReaderRef, PDFReaderProps>(({
                             border-radius: 0.5rem !important;
                             padding: 0.5rem !important;
                         }
+                        /* Fix Page Input width */
+                        .rpv-core__textbox {
+                            width: 3rem !important;
+                            text-align: center !important;
+                            padding: 2px 4px !important;
+                            border-radius: 0.375rem !important;
+                            border: 1px solid #e2e8f0 !important;
+                        }
                     `}</style>
                     <ShowSearchPopover />
                 </div>
             </div>
 
             {/* PDF Viewer */}
-            <div className="flex-1 overflow-auto bg-gray-100 text-center">
+            <div className="w-full bg-gray-100 text-center">
                 <Worker workerUrl="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js">
                     <Viewer
                         fileUrl={url}
