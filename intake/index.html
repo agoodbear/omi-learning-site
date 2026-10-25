@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OMI病例建檔（本機）</title>
+<style>
+  :root { --bg:#f7f5f2; --card:#fff; --ink:#1f2433; --muted:#646a78; --line:#e2ddd8; --accent:#c8323f; --ok:#2f7d55; --warn:#a46a12; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.6 -apple-system, "PingFang TC", sans-serif; }
+  main { max-width:1100px; margin:0 auto; padding:24px 16px 64px; display:grid; gap:18px; }
+  h1 { margin:0; font-size:22px; }
+  .note { color:var(--muted); margin:4px 0 0; font-size:14px; }
+  .tabs { display:flex; gap:8px; }
+  .tabs button { padding:8px 14px; border:1px solid var(--line); background:var(--card); border-radius:6px; cursor:pointer; font:inherit; }
+  .tabs button[aria-selected="true"] { border-color:var(--accent); color:var(--accent); font-weight:700; }
+  .grid { display:grid; grid-template-columns: minmax(0,1.4fr) minmax(0,1fr); gap:18px; }
+  @media (max-width:800px){ .grid { grid-template-columns:1fr; } }
+  section.card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; display:grid; gap:12px; min-width:0; }
+  label { display:grid; gap:4px; font-size:14px; font-weight:600; }
+  input, select, textarea { font:inherit; padding:7px 9px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; }
+  .row > label { flex:1 1 120px; }
+  canvas { max-width:100%; border:1px solid var(--line); background:#fff; }
+  .sliders { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:8px; font-size:13px; }
+  .sliders label { font-weight:400; }
+  button.primary { background:var(--accent); color:#fff; border:0; padding:10px 16px; border-radius:6px; font:inherit; font-weight:700; cursor:pointer; }
+  button.secondary { background:#fff; border:1px solid var(--line); padding:8px 14px; border-radius:6px; font:inherit; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .ocr { font-size:13px; background:#faf8f6; border:1px dashed var(--line); border-radius:6px; padding:8px; max-height:160px; overflow:auto; white-space:pre-wrap; }
+  .msg { padding:10px 12px; border-radius:6px; font-size:14px; }
+  .msg.ok { background:#e9f5ee; color:var(--ok); }
+  .msg.err { background:#fbecec; color:var(--accent); }
+  .msg.warn { background:#fdf3e3; color:var(--warn); }
+  .local { font-size:12px; color:var(--muted); }
+  .check { display:flex; gap:8px; align-items:flex-start; font-weight:400; }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>OMI病例建檔（只在這台Mac）</h1>
+    <p class="note">病歷號、年齡、性別、ECG日期與原始PDF只存在本機登錄檔。上傳到網站的只有裁切後的波形圖和主訴，日期不會上傳。</p>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="new">新病例</button>
+    <button role="tab" aria-selected="false" data-tab="link">補登網站上已有的病例</button>
+  </div>
+
+  <div id="tab-new" class="grid">
+    <section class="card">
+      <label>ECG檔案（PDF或圖片）<input id="file" type="file" accept="application/pdf,image/*"></label>
+      <div class="sliders">
+        <label>上方裁掉 <span id="v-top">32</span>%<input id="top" type="range" min="0" max="60" value="32"></label>
+        <label>下方裁掉 <span id="v-bottom">10</span>%<input id="bottom" type="range" min="0" max="40" value="10"></label>
+        <label>左邊裁掉 <span id="v-left">2</span>%<input id="left" type="range" min="0" max="30" value="2"></label>
+        <label>右邊裁掉 <span id="v-right">8</span>%<input id="right" type="range" min="0" max="30" value="8"></label>
+      </div>
+      <canvas id="preview" width="10" height="10" aria-label="裁切後預覽"></canvas>
+      <p class="local">上面是會上傳到網站的樣子。</p>
+    </section>
+
+    <section class="card">
+      <div class="row">
+        <label>病歷號<input id="mrn" autocomplete="off"></label>
+        <label>ECG日期（只存本機）<input id="ecgDate" type="date"></label>
+      </div>
+      <div class="row">
+        <label>年齡<input id="age" type="number" min="0" max="120"></label>
+        <label>性別<select id="sex"><option value="">請選</option><option>男性</option><option>女性</option></select></label>
+      </div>
+      <label>主訴（會顯示在網站）<input id="cc" placeholder="例：胸痛30分鐘"></label>
+      <label>分類<select id="category"><option value="OMI">OMI</option><option value="STEMI_mimics">STEMI mimics</option><option value="Electrolyte">電解質</option></select></label>
+      <label class="check"><input id="showAgeSex" type="checkbox" checked> 網站上顯示年齡與性別（90歲以上只顯示「90歲以上」）</label>
+
+      <button class="secondary" id="btn-check" disabled>檢查去識別</button>
+      <div id="ocr-box" hidden>
+        <div class="local">裁切後的圖裡讀到這些字（只在你的瀏覽器顯示）：</div>
+        <div class="ocr" id="ocr"></div>
+      </div>
+      <div id="check-msg"></div>
+      <label class="check"><input id="confirmed" type="checkbox"> 我已目視確認裁切後的圖沒有姓名、病歷號、日期、時間</label>
+      <button class="primary" id="btn-create" disabled>建立草稿病例</button>
+      <div id="create-msg"></div>
+    </section>
+  </div>
+
+  <div id="tab-link" hidden>
+    <section class="card">
+      <p class="note" style="margin:0">網站後台或同仁投稿建立的病例，在這裡補登病歷號。</p>
+      <label>網站上的病例<select id="caseSel"><option value="">載入中…</option></select></label>
+      <div class="row">
+        <label>病歷號<input id="l-mrn" autocomplete="off"></label>
+        <label>年齡<input id="l-age" type="number" min="0" max="120"></label>
+        <label>性別<select id="l-sex"><option value="">請選</option><option>男性</option><option>女性</option></select></label>
+        <label>ECG日期<input id="l-ecgDate" type="date"></label>
+      </div>
+      <button class="primary" id="btn-link">補登</button>
+      <div id="link-msg"></div>
+    </section>
+  </div>
+  <p class="local" id="registry"></p>
+</main>
+
+<script src="/pdf.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
+const $ = id => document.getElementById(id);
+let source = null;          // 原圖 canvas
+let originalB64 = null, originalName = null;
+let checkedPng = null;      // 通過檢查時的裁切圖（改了裁切要重檢）
+
+function msg(el, text, kind) { el.innerHTML = text ? `<div class="msg ${kind}">${text}</div>` : ""; }
+
+document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", x === b));
+  $("tab-new").hidden = b.dataset.tab !== "new";
+  $("tab-link").hidden = b.dataset.tab !== "link";
+  if (b.dataset.tab === "link") loadCases();
+}));
+
+const b64 = buf => { let s = ""; const a = new Uint8Array(buf); for (let i = 0; i < a.length; i += 0x8000) s += String.fromCharCode.apply(null, a.subarray(i, i + 0x8000)); return btoa(s); };
+
+$("file").addEventListener("change", async e => {
+  const f = e.target.files[0]; if (!f) return;
+  const buf = await f.arrayBuffer();
+  originalB64 = b64(buf); originalName = f.name;
+  const c = document.createElement("canvas");
+  if (f.type === "application/pdf") {
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    const page = await pdf.getPage(1);
+    const vp = page.getViewport({ scale: 2.5 });
+    c.width = vp.width; c.height = vp.height;
+    await page.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
+  } else {
+    const img = await createImageBitmap(f);
+    c.width = img.width; c.height = img.height;
+    c.getContext("2d").drawImage(img, 0, 0);
+  }
+  source = c; draw();
+});
+
+function crop() {
+  const t = +$("top").value, bo = +$("bottom").value, l = +$("left").value, r = +$("right").value;
+  const sx = source.width * l / 100, sy = source.height * t / 100;
+  const sw = source.width * (1 - (l + r) / 100), sh = source.height * (1 - (t + bo) / 100);
+  const out = $("preview"); out.width = Math.round(sw); out.height = Math.round(sh);
+  out.getContext("2d").drawImage(source, sx, sy, sw, sh, 0, 0, sw, sh);
+  return out.toDataURL("image/png").split(",")[1];
+}
+
+function draw() {
+  ["top", "bottom", "left", "right"].forEach(k => $("v-" + k).textContent = $(k).value);
+  if (!source) return;
+  crop();
+  checkedPng = null; $("confirmed").checked = false;
+  $("btn-check").disabled = false; $("btn-create").disabled = true;
+  msg($("check-msg"), "裁切改變了，請重新檢查去識別。", "warn");
+}
+["top", "bottom", "left", "right"].forEach(k => $(k).addEventListener("input", draw));
+
+async function post(url, body) {
+  const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); return j;
+}
+
+$("btn-check").addEventListener("click", async () => {
+  const png = crop();
+  $("btn-check").disabled = true; msg($("check-msg"), "檢查中…", "warn");
+  try {
+    const { lines, reasons } = await post("/api/check", { png, mrn: $("mrn").value });
+    $("ocr-box").hidden = false;
+    $("ocr").textContent = lines.length ? lines.join("\n") : "（沒有讀到任何文字）";
+    if (reasons.length) { msg($("check-msg"), "沒過：" + reasons.join("、") + "。請調整裁切。", "err"); checkedPng = null; }
+    else { msg($("check-msg"), "自動檢查通過。請再自己看一眼上面的圖與文字。", "ok"); checkedPng = png; }
+  } catch (e) { msg($("check-msg"), e.message, "err"); }
+  $("btn-check").disabled = false; updateCreate();
+});
+
+function updateCreate() { $("btn-create").disabled = !(checkedPng && $("confirmed").checked); }
+$("confirmed").addEventListener("change", updateCreate);
+
+$("btn-create").addEventListener("click", async () => {
+  $("btn-create").disabled = true; msg($("create-msg"), "建立中…", "warn");
+  try {
+    const j = await post("/api/create", {
+      png: checkedPng, mrn: $("mrn").value, age: Number($("age").value), sex: $("sex").value,
+      ecgDate: $("ecgDate").value, cc: $("cc").value, category: $("category").value,
+      showAgeSex: $("showAgeSex").checked, confirmed: $("confirmed").checked,
+      original: originalB64, originalName,
+    });
+    msg($("create-msg"), `已建立草稿（${j.caseId}），本機登錄檔也記好了。<br><a href="${j.editUrl}" target="_blank" rel="noopener">到網站後台補題目、答案與詳解 →</a>`, "ok");
+    ["mrn", "age", "cc", "ecgDate"].forEach(k => $(k).value = ""); $("sex").value = "";
+    $("file").value = ""; source = null; checkedPng = null; $("confirmed").checked = false;
+  } catch (e) { msg($("create-msg"), e.message, "err"); updateCreate(); }
+});
+
+async function loadCases() {
+  const r = await fetch("/api/cases"); const j = await r.json();
+  $("registry").textContent = "登錄檔位置：" + j.registry;
+  const todo = j.cases.filter(c => !c.registered);
+  $("caseSel").innerHTML = todo.length
+    ? '<option value="">請選</option>' + todo.map(c => `<option value="${c.id}">${c.title || c.id}（${c.status}）</option>`).join("")
+    : '<option value="">全部病例都已登錄</option>';
+}
+
+$("btn-link").addEventListener("click", async () => {
+  try {
+    await post("/api/link", { caseId: $("caseSel").value, mrn: $("l-mrn").value, age: Number($("l-age").value), sex: $("l-sex").value, ecgDate: $("l-ecgDate").value });
+    msg($("link-msg"), "已補登。", "ok"); ["l-mrn", "l-age", "l-ecgDate"].forEach(k => $(k).value = ""); $("l-sex").value = ""; loadCases();
+  } catch (e) { msg($("link-msg"), e.message, "err"); }
+});
+
+fetch("/api/cases").then(r => r.json()).then(j => $("registry").textContent = "登錄檔位置：" + j.registry).catch(() => {});
+</script>
+</body>
+</html>

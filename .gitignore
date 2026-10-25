@@ -45,3 +45,6 @@ service-account-key.json
 
 # firebase emulator logs
 *-debug.log
+
+# intake: compiled OCR helper
+intake/.bin/

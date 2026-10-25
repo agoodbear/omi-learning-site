@@ -12,7 +12,7 @@ if (typeof window !== "undefined") {
  * Percentages of the image to remove from each edge
  */
 export const CROP_CONFIG = {
-    topCropPercent: 29,      // Remove top 29% (patient info + header)
+    topCropPercent: 32,      // Remove top 32% (patient info + header; 29% left a Chinese text line on MUSE reports)
     bottomCropPercent: 10,   // Remove bottom 10% (print date, hospital info)
     leftCropPercent: 2,      // Remove left 2% (blank margin)
     rightCropPercent: 8      // Remove right 8% (blank margin)

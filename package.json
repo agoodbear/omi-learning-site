@@ -9,7 +9,9 @@
     "lint": "eslint",
     "test:rules": "firebase emulators:exec --only firestore --project omi-rules-test \"node --test tests/firestore.rules.test.mjs\"",
     "test:actions": "firebase emulators:exec --only firestore,auth --project omi-rules-test \"node --conditions=react-server --import tsx --test tests/actions.test.mts\"",
-    "test": "npm run test:rules && npm run test:actions"
+    "test": "npm run test:rules && npm run test:actions && npm run test:intake",
+    "intake": "node intake/server.mjs",
+    "test:intake": "firebase emulators:exec --only firestore,storage --project omi-ecg-learning-site \"node --test tests/intake.test.mjs\""
   },
   "dependencies": {
     "@react-pdf-viewer/core": "^3.12.0",
