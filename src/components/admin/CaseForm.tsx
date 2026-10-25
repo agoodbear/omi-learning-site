@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { storage, db } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { doc, addDoc, updateDoc, collection, Timestamp } from "firebase/firestore";
+import { doc, addDoc, updateDoc, collection, Timestamp, getDoc, setDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Case, CaseCategory } from "@/types/firestore-schema";
 import { Upload, X, Plus, Save, Send, Loader2, Image as ImageIcon, ZoomIn, FileText } from "lucide-react";
@@ -44,6 +44,25 @@ export default function CaseForm({ initialData, mode, submitter }: CaseFormProps
         return true;
     });
 
+    // 病人資料：存在 caseRegistry（只有管理員讀寫），不放進公開的 cases 文件
+    const isAdminForm = mode !== "submit";
+    const [mrn, setMrn] = useState("");
+    const [age, setAge] = useState("");
+    const [sex, setSex] = useState("");
+    const [ecgDate, setEcgDate] = useState("");
+
+    useEffect(() => {
+        if (!isAdminForm || !initialData?.id) return;
+        getDoc(doc(db, "caseRegistry", initialData.id)).then(snap => {
+            const r = snap.data();
+            if (!r) return;
+            setMrn(r.mrn || "");
+            setAge(r.age != null ? String(r.age) : "");
+            setSex(r.sex || "");
+            setEcgDate(r.ecgDate || "");
+        }).catch(console.error);
+    }, [isAdminForm, initialData?.id]);
+
     // Zoom State
     const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
@@ -56,6 +75,12 @@ export default function CaseForm({ initialData, mode, submitter }: CaseFormProps
         if (!title.trim()) newErrors.title = "標題為必填";
         if (!clinicalContext.trim()) newErrors.clinicalContext = "臨床情境為必填";
         if (ecgImages.length === 0) newErrors.ecgImages = "請至少上傳一張 ECG 圖片";
+        if (isAdminForm) {
+            const n = Number(age);
+            if (!mrn.trim()) newErrors.mrn = "病歷號為必填";
+            if (!age.trim() || !Number.isInteger(n) || n < 0 || n > 120) newErrors.age = "年齡要是 0–120 的整數";
+            if (!sex) newErrors.sex = "請選性別";
+        }
 
         // Quiz validation only if includeQuiz is true
         if (includeQuiz) {
@@ -195,13 +220,25 @@ export default function CaseForm({ initialData, mode, submitter }: CaseFormProps
                 caseData.submittedBy = submitter;
             }
 
+            let caseId = initialData?.id;
             if (mode === "create" || mode === "submit") {
-                await addDoc(collection(db, "cases"), {
+                const created = await addDoc(collection(db, "cases"), {
                     ...caseData,
                     createdAt: Timestamp.now(),
                 });
+                caseId = created.id;
             } else if (initialData?.id) {
                 await updateDoc(doc(db, "cases", initialData.id), caseData);
+            }
+
+            if (isAdminForm && caseId) {
+                await setDoc(doc(db, "caseRegistry", caseId), {
+                    mrn: mrn.trim(),
+                    age: Number(age),
+                    sex,
+                    ecgDate,
+                    updatedAt: Timestamp.now(),
+                }, { merge: true });
             }
 
             // Redirect based on mode
@@ -272,6 +309,36 @@ export default function CaseForm({ initialData, mode, submitter }: CaseFormProps
                     </div>
                 </div>
             </section>
+
+            {isAdminForm && (
+                <section className="card p-6">
+                    <h2 className="text-lg font-semibold text-foreground mb-1">病人資料</h2>
+                    <p className="text-sm text-muted mb-4">只有管理員看得到，不會出現在病例頁。日期只存在這裡。</p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <label className="block text-sm font-medium">病歷號
+                            <input value={mrn} onChange={e => setMrn(e.target.value)} autoComplete="off"
+                                className="mt-1 w-full border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary" />
+                            {errors.mrn && <span className="text-alert-red text-xs">{errors.mrn}</span>}
+                        </label>
+                        <label className="block text-sm font-medium">年齡
+                            <input type="number" min={0} max={120} value={age} onChange={e => setAge(e.target.value)}
+                                className="mt-1 w-full border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary" />
+                            {errors.age && <span className="text-alert-red text-xs">{errors.age}</span>}
+                        </label>
+                        <label className="block text-sm font-medium">性別
+                            <select value={sex} onChange={e => setSex(e.target.value)}
+                                className="mt-1 w-full border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary">
+                                <option value="">請選</option><option>男性</option><option>女性</option>
+                            </select>
+                            {errors.sex && <span className="text-alert-red text-xs">{errors.sex}</span>}
+                        </label>
+                        <label className="block text-sm font-medium">ECG 日期
+                            <input type="date" value={ecgDate} onChange={e => setEcgDate(e.target.value)}
+                                className="mt-1 w-full border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary" />
+                        </label>
+                    </div>
+                </section>
+            )}
 
             {/* Section 2: Clinical Context */}
             <section className="card p-6">

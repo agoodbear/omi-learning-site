@@ -18,6 +18,9 @@ export async function deleteCase(idToken: string, caseId: string) {
         // Delete case stats
         batch.delete(adminDb.collection("caseStats").doc(caseId));
 
+        // Patient registry (MRN etc.) goes with the case
+        batch.delete(adminDb.collection("caseRegistry").doc(caseId));
+
         // Note: We are keeping comments and attempts for now to avoid massive fan-out deletion
         // or we could delete them if strict cleanup is needed. 
         // For typical "soft" admin management, deleting the main pointer is often enough, 

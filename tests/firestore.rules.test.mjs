@@ -101,6 +101,17 @@ test("管理員可以核准別人、讀所有人", async () => {
     await assertSucceeds(getDocs(collection(as(ADMIN), "users")));
 });
 
+test("病人資料（caseRegistry）只有管理員能讀寫", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "caseRegistry/c1"), { mrn: "x", age: 60, sex: "男性" });
+    });
+    await assertFails(getDoc(doc(as(OK), "caseRegistry/c1")));
+    await assertFails(setDoc(doc(as(OK), "caseRegistry/c9"), { mrn: "y" }));
+    await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), "caseRegistry/c1")));
+    await assertSucceeds(getDoc(doc(as(ADMIN), "caseRegistry/c1")));
+    await assertSucceeds(setDoc(doc(as(ADMIN), "caseRegistry/c9"), { mrn: "y" }));
+});
+
 test("一般人不能列出所有帳號", async () => {
     await assertFails(getDocs(collection(as(OK), "users")));
 });

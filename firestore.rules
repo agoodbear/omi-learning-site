@@ -89,6 +89,11 @@ service cloud.firestore {
       allow read: if isOwner(uid);
     }
 
+    // --- 病人資料（病歷號、年齡、性別、ECG日期）：只有管理員 ---
+    match /caseRegistry/{caseId} {
+      allow read, write: if isAdmin();
+    }
+
     // --- Research ---
     // 臨床資料（病人層級）只在本機分析，不放 Firebase。
     match /clinicalEvents/{eventId} {

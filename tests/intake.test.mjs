@@ -1,4 +1,4 @@
-// 本機建檔工具測試：npm run test:intake（Firestore＋Storage 模擬器、暫存登錄檔，不碰正式資料與 ~/phi-local）
+// 本機建檔工具測試：npm run test:intake（Firestore＋Storage 模擬器、暫存資料夾，不碰正式資料與 ~/phi-local）
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, execFileSync } from "node:child_process";
@@ -60,7 +60,10 @@ test("圖裡有病歷號和日期：檢查不過、也不能建立", async () =>
     assert.ok(chk.reasons.some(x => x.includes("日期")));
     const r = await post("/api/create", { ...person, png, cc: "胸痛", category: "OMI", showAgeSex: true, confirmed: true });
     assert.equal(r.status, 400);
-    assert.ok(!existsSync(join(PHI, "registry.csv")) || !readFileSync(join(PHI, "registry.csv"), "utf8").includes(person.mrn));
+    const { getFirestore } = await import("firebase-admin/firestore");
+    const { initializeApp, getApps } = await import("firebase-admin/app");
+    if (!getApps().length) initializeApp({ projectId: "omi-ecg-learning-site" });
+    assert.equal((await getFirestore().collection("caseRegistry").get()).size, 0);
 });
 
 test("圖裡有中文（可能是姓名）會被擋", async () => {
@@ -73,7 +76,7 @@ test("沒勾目視確認不能建立", async () => {
     assert.equal(r.status, 400);
 });
 
-test("乾淨的圖：網站只有主訴與年齡性別，病歷號與日期只在本機登錄檔", async () => {
+test("乾淨的圖：病例頁只有主訴與年齡性別，病歷號與日期在 caseRegistry", async () => {
     const png = makePng(false);
     const r = await post("/api/create", {
         ...person, png, cc: "胸痛30分鐘", category: "OMI", showAgeSex: true, confirmed: true,
@@ -83,8 +86,6 @@ test("乾淨的圖：網站只有主訴與年齡性別，病歷號與日期只�
     const { caseId } = await r.json();
 
     const { getFirestore } = await import("firebase-admin/firestore");
-    const { initializeApp, getApps } = await import("firebase-admin/app");
-    if (!getApps().length) initializeApp({ projectId: "omi-ecg-learning-site" });
     const doc = (await getFirestore().doc(`cases/${caseId}`).get()).data();
     const onSite = JSON.stringify(doc);
     assert.equal(doc.status, "draft");
@@ -92,8 +93,10 @@ test("乾淨的圖：網站只有主訴與年齡性別，病歷號與日期只�
     assert.ok(!onSite.includes(person.mrn), "網站資料不能有病歷號");
     assert.ok(!onSite.includes("2026-10-25"), "網站資料不能有ECG日期");
 
-    const reg = readFileSync(join(PHI, "registry.csv"), "utf8");
-    assert.ok(reg.includes(caseId) && reg.includes(person.mrn) && reg.includes("2026-10-25"));
+    const reg = (await getFirestore().doc(`caseRegistry/${caseId}`).get()).data();
+    assert.equal(reg.mrn, person.mrn);
+    assert.equal(reg.ecgDate, "2026-10-25");
+    assert.equal(reg.age, 67);
     assert.ok(existsSync(join(PHI, "originals", `${caseId}.pdf`)));
 });
 
@@ -115,5 +118,5 @@ test("補登：網站已有的病例可補登一次，重複補登會被擋", as
     assert.equal(dup.status, 409);
     const missing = await post("/api/link", { ...person, caseId: "nope" });
     assert.equal(missing.status, 404);
-    assert.ok(readFileSync(join(PHI, "registry.csv"), "utf8").includes("87654321"));
+    assert.equal((await getFirestore().doc("caseRegistry/existing1").get()).data().mrn, "87654321");
 });

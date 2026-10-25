@@ -41,7 +41,7 @@
 <main>
   <header>
     <h1>OMI病例建檔（只在這台Mac）</h1>
-    <p class="note">病歷號、年齡、性別、ECG日期與原始PDF只存在本機登錄檔。上傳到網站的只有裁切後的波形圖和主訴，日期不會上傳。</p>
+    <p class="note">病例頁只顯示裁切後的波形圖和主訴。病歷號、年齡、性別、ECG日期存在網站的病人資料區（只有管理員看得到）。原始PDF只存在這台Mac。</p>
   </header>
 
   <div class="tabs" role="tablist">
@@ -65,7 +65,7 @@
     <section class="card">
       <div class="row">
         <label>病歷號<input id="mrn" autocomplete="off"></label>
-        <label>ECG日期（只存本機）<input id="ecgDate" type="date"></label>
+        <label>ECG日期（不會顯示在病例頁）<input id="ecgDate" type="date"></label>
       </div>
       <div class="row">
         <label>年齡<input id="age" type="number" min="0" max="120"></label>
@@ -89,7 +89,7 @@
 
   <div id="tab-link" hidden>
     <section class="card">
-      <p class="note" style="margin:0">網站後台或同仁投稿建立的病例，在這裡補登病歷號。</p>
+      <p class="note" style="margin:0">同仁投稿的病例可在這裡補登病歷號（也可以直接在網站後台編輯頁補）。</p>
       <label>網站上的病例<select id="caseSel"><option value="">載入中…</option></select></label>
       <div class="row">
         <label>病歷號<input id="l-mrn" autocomplete="off"></label>
@@ -191,7 +191,7 @@ $("btn-create").addEventListener("click", async () => {
       showAgeSex: $("showAgeSex").checked, confirmed: $("confirmed").checked,
       original: originalB64, originalName,
     });
-    msg($("create-msg"), `已建立草稿（${j.caseId}），本機登錄檔也記好了。<br><a href="${j.editUrl}" target="_blank" rel="noopener">到網站後台補題目、答案與詳解 →</a>`, "ok");
+    msg($("create-msg"), `已建立草稿（${j.caseId}），病人資料也記好了。<br><a href="${j.editUrl}" target="_blank" rel="noopener">到網站後台補題目、答案與詳解 →</a>`, "ok");
     ["mrn", "age", "cc", "ecgDate"].forEach(k => $(k).value = ""); $("sex").value = "";
     $("file").value = ""; source = null; checkedPng = null; $("confirmed").checked = false;
   } catch (e) { msg($("create-msg"), e.message, "err"); updateCreate(); }
@@ -199,7 +199,7 @@ $("btn-create").addEventListener("click", async () => {
 
 async function loadCases() {
   const r = await fetch("/api/cases"); const j = await r.json();
-  $("registry").textContent = "登錄檔位置：" + j.registry;
+  $("registry").textContent = "原始PDF存放：" + j.originals;
   const todo = j.cases.filter(c => !c.registered);
   $("caseSel").innerHTML = todo.length
     ? '<option value="">請選</option>' + todo.map(c => `<option value="${c.id}">${c.title || c.id}（${c.status}）</option>`).join("")
@@ -213,7 +213,7 @@ $("btn-link").addEventListener("click", async () => {
   } catch (e) { msg($("link-msg"), e.message, "err"); }
 });
 
-fetch("/api/cases").then(r => r.json()).then(j => $("registry").textContent = "登錄檔位置：" + j.registry).catch(() => {});
+fetch("/api/cases").then(r => r.json()).then(j => $("registry").textContent = "原始PDF存放：" + j.originals).catch(() => {});
 </script>
 </body>
 </html>

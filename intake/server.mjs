@@ -1,5 +1,5 @@
 // 本機病例建檔工具：npm run intake → http://127.0.0.1:5317
-// 原始 PDF、病歷號、年齡、性別、ECG日期只寫進 ~/phi-local；上傳到網站的只有裁切後的波形圖與主訴。
+// 公開病例只放裁切後的波形圖與主訴；病歷號／年齡／性別／ECG日期寫進 caseRegistry（只有管理員讀得到）；原始 PDF 只留本機。
 import http from "node:http";
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -11,7 +11,7 @@ import { promisify } from "node:util";
 import { initializeApp, cert } from "firebase-admin/app";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
-import { appendRow, ensureDirs, registeredCaseIds, ORIGINALS, REGISTRY } from "./registry.mjs";
+import { ensureDirs, ORIGINALS } from "./registry.mjs";
 
 const run = promisify(execFile);
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -87,6 +87,13 @@ async function readJson(req) {
     return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
 
+function registryDoc(b, originalFile) {
+    return {
+        mrn: String(b.mrn).trim(), age: Number(b.age), sex: b.sex, ecgDate: b.ecgDate || "",
+        originalFile, updatedAt: Timestamp.now(),
+    };
+}
+
 function validatePerson({ mrn, age, sex }) {
     if (!String(mrn || "").trim()) return "請填病歷號";
     const n = Number(age);
@@ -113,10 +120,10 @@ const server = http.createServer(async (req, res) => {
         if (req.method === "POST" && req.headers.origin !== ORIGIN) return send(res, 403, { error: "forbidden" });
 
         if (req.method === "GET" && req.url === "/api/cases") {
-            const done = registeredCaseIds();
+            const done = new Set((await db.collection("caseRegistry").select().get()).docs.map(d => d.id));
             const snap = await db.collection("cases").select("title", "status", "category").get();
             const cases = snap.docs.map(d => ({ id: d.id, ...d.data(), registered: done.has(d.id) }));
-            return send(res, 200, { cases, registry: REGISTRY });
+            return send(res, 200, { cases, originals: ORIGINALS });
         }
 
         if (req.method === "POST" && req.url === "/api/check") {
@@ -165,11 +172,7 @@ const server = http.createServer(async (req, res) => {
                 original = `${ref.id}${extname(b.originalName) || ".pdf"}`;
                 writeFileSync(join(ORIGINALS, original), Buffer.from(b.original, "base64"), { mode: 0o600 });
             }
-            appendRow({
-                case_id: ref.id, 病歷號: String(b.mrn).trim(), 年齡: b.age, 性別: b.sex,
-                ECG日期: b.ecgDate || "", 主訴: cc, 分類: b.category,
-                建立時間: new Date().toLocaleString("sv-SE", { timeZone: "Asia/Taipei" }), 原始檔: original,
-            });
+            await db.doc(`caseRegistry/${ref.id}`).set(registryDoc(b, original));
             return send(res, 200, { caseId: ref.id, editUrl: `${SITE}/admin/cases/${ref.id}/edit` });
         }
 
@@ -179,12 +182,8 @@ const server = http.createServer(async (req, res) => {
             if (bad) return send(res, 400, { error: bad });
             const snap = await db.doc(`cases/${b.caseId}`).get();
             if (!snap.exists) return send(res, 404, { error: "網站上找不到這個病例" });
-            if (registeredCaseIds().has(b.caseId)) return send(res, 409, { error: "這個病例已經登錄過了" });
-            appendRow({
-                case_id: b.caseId, 病歷號: String(b.mrn).trim(), 年齡: b.age, 性別: b.sex,
-                ECG日期: b.ecgDate || "", 主訴: snap.data().clinical_context || "", 分類: snap.data().category || "",
-                建立時間: new Date().toLocaleString("sv-SE", { timeZone: "Asia/Taipei" }), 原始檔: "",
-            });
+            if ((await db.doc(`caseRegistry/${b.caseId}`).get()).exists) return send(res, 409, { error: "這個病例已經登錄過了" });
+            await db.doc(`caseRegistry/${b.caseId}`).set(registryDoc(b, ""));
             return send(res, 200, { caseId: b.caseId });
         }
 
@@ -199,5 +198,5 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, "127.0.0.1", () => {
     ensureDirs();
     console.log(`OMI 病例建檔工具：${ORIGIN}`);
-    console.log(`登錄檔（只在本機）：${REGISTRY}`);
+    console.log(`原始 PDF（只在本機）：${ORIGINALS}`);
 });
