@@ -7,8 +7,13 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      // Hardcoded admin check matching client (should ideally use custom claims)
-      return request.auth != null && request.auth.token.email == '16022@omi.local';
+      // 管理員＝Auth custom claim admin:true（只有 Admin SDK 能設；2026-11-08 起不再認 email 字串）
+      return request.auth != null && request.auth.token.get('admin', false) == true;
+    }
+
+    // 帳號的員工編號＝登入 email 的 @ 前段（email 由 Firebase Auth 保證唯一）
+    function myEmployeeId() {
+      return request.auth.token.email.split('@')[0];
     }
 
     function isOwner(uid) {
@@ -24,8 +29,10 @@ service cloud.firestore {
     // --- Users & Profiles ---
     match /users/{uid} {
       allow read: if isOwner(uid) || isAdmin();
+      // employeeId 必須跟登入帳號一致，不能自稱別人的員編（2026-11-08）
       allow create: if isAdmin() ||
-        (isOwner(uid) && request.resource.data.get('approved', false) == false);
+        (isOwner(uid) && request.resource.data.get('approved', false) == false &&
+         request.resource.data.get('employeeId', '') == myEmployeeId());
       allow update: if isAdmin() ||
         (isOwner(uid) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['approved', 'employeeId']));
       allow delete: if isAdmin();
@@ -105,14 +112,38 @@ service cloud.firestore {
     }
 
     // --- Social (Comments) ---
+    // 表情只有四種；每次只能把「自己」加進或移出某個表情的名單（2026-11-08）
+    function reactionOk(e) {
+      let after = request.resource.data.reactions;
+      let before = resource.data.get('reactions', {});
+      return (e in after)
+        ? (after[e] is list && after[e].size() <= 500 &&
+           after[e].toSet().difference(before.get(e, []).toSet()).hasOnly([request.auth.uid]) &&
+           before.get(e, []).toSet().difference(after[e].toSet()).hasOnly([request.auth.uid]))
+        // 整個表情被拿掉：原本名單只能是自己一個人
+        : (!(e in before) || before[e] == [request.auth.uid]);
+    }
+    function reactionsAllOk() {
+      let after = request.resource.data.reactions;
+      return after is map && after.keys().hasOnly(['👍', '❤️', '🔥', '😮']) &&
+        reactionOk('👍') && reactionOk('❤️') && reactionOk('🔥') && reactionOk('😮');
+    }
+
     match /comments/{commentId} {
       allow read: if isApproved();
-      allow create: if isApproved() && request.resource.data.userId == request.auth.uid;
-      // 作者可改自己的留言；其他人只能動表情回應
+      // 顯示名稱 userEmail 必須是自己的員編，不能冒用別人
+      allow create: if isApproved() && request.resource.data.userId == request.auth.uid &&
+        request.resource.data.keys().hasOnly(['caseId', 'userId', 'userEmail', 'content', 'createdAt', 'reactions']) &&
+        request.resource.data.get('userEmail', '') == myEmployeeId() &&
+        request.resource.data.get('reactions', {}) == {} &&
+        request.resource.data.content is string && request.resource.data.content.size() <= 5000;
+      // 作者可改自己的留言內容（不能改顯示名稱）；其他人只能動表情回應
       allow update: if isAdmin() ||
         (isApproved() && resource.data.userId == request.auth.uid &&
-         request.resource.data.userId == request.auth.uid) ||
-        (isApproved() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions']));
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['content', 'updatedAt']) &&
+         request.resource.data.content is string && request.resource.data.content.size() <= 5000) ||
+        (isApproved() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions']) &&
+         reactionsAllOk());
       allow delete: if isAdmin() || (isLoggedIn() && resource.data.userId == request.auth.uid);
     }
   }

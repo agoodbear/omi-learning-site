@@ -45,7 +45,7 @@ export default function ResearchExportPage() {
                 mimeType = "application/json";
                 extension = "json";
             } else {
-                content = Papa.unparse(data);
+                content = Papa.unparse(data, { escapeFormulae: true }); // 防 Excel 公式注入（2026-11-08）
                 mimeType = "text/csv;charset=utf-8;";
                 extension = "csv";
             }

@@ -22,15 +22,12 @@ export function emailToEmployeeId(email: string | null | undefined): string | nu
 }
 
 /**
- * Checks if a given employee ID is an admin based on environment variables.
- * @param employeeId The employee ID to check
- * @returns true if admin, false otherwise
+ * 管理員只認 Firebase Auth custom claim `admin: true`（只有 Admin SDK 能設，見 scripts/createAdmin.ts）。
+ * 不看 email 字串、也不看 users/{uid}.employeeId（後者是使用者註冊時自己寫的）。
+ * 2026-11-08 security-audit 修正。
  */
-export function isAdmin(employeeId: string): boolean {
-    const adminIds = (process.env.NEXT_PUBLIC_ADMIN_EMPLOYEE_IDS || "")
-        .split(",")
-        .map((id) => id.trim());
-    return adminIds.includes(employeeId);
+export function isAdminClaims(claims: Record<string, unknown> | null | undefined): boolean {
+    return claims?.admin === true;
 }
 
 /**

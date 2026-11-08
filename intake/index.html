@@ -197,12 +197,15 @@ $("btn-create").addEventListener("click", async () => {
   } catch (e) { msg($("create-msg"), e.message, "err"); updateCreate(); }
 });
 
+// 病例標題是網站使用者寫的，塞進 innerHTML 前要跳脫（2026-11-08 security-audit）
+function escHtml(s) { return String(s ?? "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch])); }
+
 async function loadCases() {
   const r = await fetch("/api/cases"); const j = await r.json();
   $("registry").textContent = "原始PDF存放：" + j.originals;
   const todo = j.cases.filter(c => !c.registered);
   $("caseSel").innerHTML = todo.length
-    ? '<option value="">請選</option>' + todo.map(c => `<option value="${c.id}">${c.title || c.id}（${c.status}）</option>`).join("")
+    ? '<option value="">請選</option>' + todo.map(c => `<option value="${escHtml(c.id)}">${escHtml(c.title || c.id)}（${escHtml(c.status)}）</option>`).join("")
     : '<option value="">全部病例都已登錄</option>';
 }
 

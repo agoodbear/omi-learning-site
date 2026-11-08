@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { User, onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase/config";
-import { emailToEmployeeId, isAdmin } from "./utils";
+import { emailToEmployeeId, isAdminClaims } from "./utils";
 import { UserProfile } from "@/types/user";
 import { logEvent } from "@/lib/events";
 import { awardLoginPoints } from "@/app/actions/gamification";
@@ -31,12 +31,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
+    const [adminClaim, setAdminClaim] = useState(false);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             setUser(firebaseUser);
 
             if (firebaseUser) {
+                try {
+                    const tokenResult = await firebaseUser.getIdTokenResult();
+                    setAdminClaim(isAdminClaims(tokenResult.claims));
+                } catch {
+                    setAdminClaim(false);
+                }
                 const employeeId = emailToEmployeeId(firebaseUser.email);
                 if (employeeId) {
                     // Fetch or Create Profile
@@ -81,6 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 }
             } else {
                 setUserProfile(null);
+                setAdminClaim(false);
                 // Clear session flag on logout so next login counts
                 if (typeof window !== "undefined") {
                     sessionStorage.removeItem("session_logged");
@@ -93,7 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return () => unsubscribe();
     }, []);
 
-    const isAdminUser = userProfile ? isAdmin(userProfile.employeeId) : false;
+    const isAdminUser = adminClaim;
     const isApproved = isAdminUser || userProfile?.approved === true;
 
     const signOut = async () => {

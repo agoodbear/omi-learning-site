@@ -34,7 +34,7 @@ export async function deidentifyEcgPdf(
     const arrayBuffer = await pdfFile.arrayBuffer();
 
     // Load PDF document
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer, isEvalSupported: false }).promise;
 
     // Get the specified page
     const page = await pdf.getPage(pageNum);
@@ -106,6 +106,6 @@ export async function deidentifyEcgPdf(
  */
 export async function getPdfPageCount(pdfFile: File): Promise<number> {
     const arrayBuffer = await pdfFile.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer, isEvalSupported: false }).promise;
     return pdf.numPages;
 }

@@ -10,11 +10,12 @@ import { doc, getDoc, setDoc, updateDoc, getDocs, collection, addDoc } from "fir
 
 let env;
 
-const ADMIN = { uid: "admin", email: "16022@omi.local" };
+const ADMIN = { uid: "admin", email: "16022@omi.local", admin: true };
+const NOCLAIM = { uid: "noclaim", email: "16022@omi.local" }; // 帳號字串像管理員、但沒有 admin claim
 const OK = { uid: "ok", email: "20001@omi.local" };       // 已核准
 const PENDING = { uid: "pending", email: "20002@omi.local" }; // 待核准
 
-const as = (u) => env.authenticatedContext(u.uid, { email: u.email }).firestore();
+const as = (u) => env.authenticatedContext(u.uid, u.admin ? { email: u.email, admin: true } : { email: u.email }).firestore();
 
 before(async () => {
     env = await initializeTestEnvironment({
@@ -114,4 +115,50 @@ test("病人資料（caseRegistry）只有管理員能讀寫", async () => {
 
 test("一般人不能列出所有帳號", async () => {
     await assertFails(getDocs(collection(as(OK), "users")));
+});
+
+// ---- 2026-11-08 security-audit 修正 ----
+
+test("管理員只認 admin claim：只有 16022 帳號字串不算", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "caseRegistry/c1"), { mrn: "x" });
+    });
+    await assertFails(getDoc(doc(as(NOCLAIM), "caseRegistry/c1")));
+    await assertFails(getDoc(doc(as(NOCLAIM), "cases/c2")));
+    await assertSucceeds(getDoc(doc(as(ADMIN), "caseRegistry/c1")));
+});
+
+test("註冊時 employeeId 必須跟登入帳號一致", async () => {
+    const u = { uid: "new2", email: "20010@omi.local" };
+    await assertFails(setDoc(doc(as(u), "users/new2"), { uid: "new2", employeeId: "16022", approved: false }));
+    await assertFails(setDoc(doc(as(u), "users/new2"), { uid: "new2", approved: false }));
+    await assertSucceeds(setDoc(doc(as(u), "users/new2"), { uid: "new2", employeeId: "20010", approved: false }));
+});
+
+test("留言不能冒用別人的員編、不能自帶表情", async () => {
+    const base = { caseId: "c1", userId: "ok", content: "hi", reactions: {} };
+    await assertFails(addDoc(collection(as(OK), "comments"), { ...base, userEmail: "16022" }));
+    await assertFails(addDoc(collection(as(OK), "comments"), { ...base, userEmail: "20001", reactions: { "👍": ["a", "b"] } }));
+    await assertFails(addDoc(collection(as(OK), "comments"), { ...base, userEmail: "20001", isPinned: true }));
+    await assertSucceeds(addDoc(collection(as(OK), "comments"), { ...base, userEmail: "20001" }));
+});
+
+test("作者改留言不能改顯示名稱", async () => {
+    await assertFails(updateDoc(doc(as(OK), "comments/m1"), { userEmail: "16022" }));
+});
+
+test("表情只能加減自己、只能用四種、名單要是陣列", async () => {
+    const other = { uid: "other", email: "20009@omi.local" };
+    await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), "users/other"), { uid: "other", employeeId: "20009", approved: true });
+        await setDoc(doc(ctx.firestore(), "comments/m2"), { userId: "ok", content: "hi", reactions: { "👍": ["ok"] } });
+    });
+    await assertFails(updateDoc(doc(as(other), "comments/m2"), { reactions: { "👍": ["ok", "x"] } }));
+    await assertFails(updateDoc(doc(as(other), "comments/m2"), { reactions: { "👍": [] } }));       // 把別人拿掉
+    await assertFails(updateDoc(doc(as(other), "comments/m2"), { reactions: {} }));                // 整個表情刪掉
+    await assertFails(updateDoc(doc(as(other), "comments/m2"), { reactions: { "👍": ["ok"], "💩": ["other"] } }));
+    await assertFails(updateDoc(doc(as(other), "comments/m2"), { reactions: { "👍": "ok" } }));
+    await assertSucceeds(updateDoc(doc(as(other), "comments/m2"), { reactions: { "👍": ["ok", "other"] } }));
+    await assertSucceeds(updateDoc(doc(as(other), "comments/m2"), { reactions: { "👍": ["ok"] } }));
+    await assertSucceeds(updateDoc(doc(as(OK), "comments/m2"), { reactions: {} }));                 // 只剩自己時可以整個拿掉
 });

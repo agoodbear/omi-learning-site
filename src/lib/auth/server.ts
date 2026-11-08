@@ -1,7 +1,7 @@
 import "server-only";
 
 import { adminAuth, adminDb } from "@/lib/firebase/admin";
-import { emailToEmployeeId, isAdmin } from "./utils";
+import { emailToEmployeeId, isAdminClaims } from "./utils";
 
 export interface VerifiedUser {
     uid: string;
@@ -20,7 +20,7 @@ export async function requireUser(idToken: string): Promise<VerifiedUser> {
     const employeeId = emailToEmployeeId(decoded.email);
     if (!employeeId) throw new Error("Unauthorized");
 
-    return { uid: decoded.uid, employeeId, isAdmin: isAdmin(employeeId) };
+    return { uid: decoded.uid, employeeId, isAdmin: isAdminClaims(decoded) };
 }
 
 /**

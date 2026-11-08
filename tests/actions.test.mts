@@ -17,12 +17,21 @@ process.env.FIREBASE_SERVICE_ACCOUNT_KEY = JSON.stringify({
 process.env.GCLOUD_PROJECT = PROJECT;
 process.env.NEXT_PUBLIC_ADMIN_EMPLOYEE_IDS = "16022";
 
-const { adminDb } = await import("@/lib/firebase/admin");
+const { adminDb, adminAuth } = await import("@/lib/firebase/admin");
 const { submitQuizAttempt } = await import("@/app/actions/submitQuiz");
 const { deleteCase } = await import("@/app/actions/deleteContent");
 const { exportCollection } = await import("@/app/actions/exportData");
 const { setUserApprovedAction } = await import("@/app/actions/userManagement");
 const { logView } = await import("@/app/actions/logView");
+
+async function signIn(employeeId: string): Promise<string> {
+    const res = await fetch(`${AUTH}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: `${employeeId}@omi.local`, password: "test-pass-123", returnSecureToken: true }),
+    });
+    return (await res.json()).idToken;
+}
 
 async function signUp(employeeId: string): Promise<{ uid: string; token: string }> {
     const res = await fetch(`${AUTH}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake`, {
@@ -38,12 +47,16 @@ async function signUp(employeeId: string): Promise<{ uid: string; token: string 
 const FORGED = "eyJhbGciOiJub25lIn0.eyJ1aWQiOiJhZG1pbiJ9.";
 
 let admin: { uid: string; token: string };
+let adminNoClaimToken: string;
 let ok: { uid: string; token: string };
 let pending: { uid: string; token: string };
 
 before(async () => {
     await fetch(`${AUTH}/emulator/v1/projects/${PROJECT}/accounts`, { method: "DELETE" });
     admin = await signUp("16022");
+    adminNoClaimToken = admin.token;
+    await adminAuth.setCustomUserClaims(admin.uid, { admin: true });
+    admin.token = await signIn("16022");
     ok = await signUp("20001");
     pending = await signUp("20002");
     await adminDb.doc(`users/${ok.uid}`).set({ uid: ok.uid, employeeId: "20001", approved: true });
@@ -97,4 +110,10 @@ test("不能用草稿或不存在的病例作答", async () => {
     await adminDb.doc("cases/d1").set({ status: "draft", correct_answer: 0 });
     await assert.rejects(submitQuizAttempt(ok.token, { categoryFilter: "All", items: [{ caseId: "d1", selected: 0 }] }));
     await assert.rejects(submitQuizAttempt(ok.token, { categoryFilter: "All", items: [{ caseId: "nope", selected: 0 }] }));
+});
+
+test("沒有 admin claim 的 16022 帳號不是管理員（2026-11-08）", async () => {
+    await assert.rejects(exportCollection(adminNoClaimToken, "users"));
+    await assert.rejects(deleteCase(adminNoClaimToken, "q1"));
+    assert.ok((await adminDb.doc("cases/q1").get()).exists);
 });

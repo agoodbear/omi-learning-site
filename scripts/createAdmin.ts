@@ -10,7 +10,8 @@ dotenv.config({ path: ".env.local" });
 dotenv.config(); // fallback to .env
 
 const ADMIN_ID = process.env.NEXT_PUBLIC_ADMIN_EMPLOYEE_IDS?.split(',')[0].trim() || "16022";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "12345678";
+// 不給預設密碼：新建帳號時一定要自己用 ADMIN_PASSWORD 帶一組強密碼（2026-11-08 security-audit）
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
 const EMAIL_DOMAIN = "omi.local";
 
 const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS || "./service-account-key.json";
@@ -55,6 +56,10 @@ async function main() {
         console.log("User already exists inside Auth.");
     } catch (e: any) {
         if (e.code === "auth/user-not-found") {
+            if (ADMIN_PASSWORD.length < 12) {
+                console.error("Error: 新建管理員要用 ADMIN_PASSWORD 環境變數帶一組至少 12 字元的密碼。");
+                process.exit(1);
+            }
             console.log("Creating new Auth user...");
             const newUser = await auth.createUser({
                 email,
@@ -69,6 +74,10 @@ async function main() {
         }
     }
 
+    // 管理員權限＝Auth custom claim admin:true（rules、server action、前端都只認這個）
+    await auth.setCustomUserClaims(uid, { admin: true });
+    console.log("Custom claim admin:true set（要重新登入才會生效）.");
+
     // Create/Update Firestore Profile with role: 'admin'
     console.log(`Updating Firestore profile for ${uid}...`);
     await db.collection("users").doc(uid).set(
@@ -82,7 +91,7 @@ async function main() {
     );
 
     console.log("✅ Admin setup complete!");
-    console.log(`Login with: ${ADMIN_ID} / ${ADMIN_PASSWORD}`);
+    console.log(`Login with employee ID: ${ADMIN_ID}`);
 }
 
 main();

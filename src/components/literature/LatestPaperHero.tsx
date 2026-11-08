@@ -16,6 +16,10 @@ interface LatestPaperHeroProps {
 
 import { useAuth } from "@/lib/auth/AuthContext";
 
+// CVE-2024-4367：pdfjs 3.x 遇到惡意字型會用 eval 執行程式；關掉 eval 是官方建議的緩解（2026-11-08 security-audit）
+const noEvalParams = <T extends object>(options: T): T => ({ ...options, isEvalSupported: false });
+
+
 export default function LatestPaperHero({ paper }: LatestPaperHeroProps) {
     const { isAdminUser } = useAuth();
     const [isExpanded, setIsExpanded] = useState(false);
@@ -35,6 +39,7 @@ export default function LatestPaperHero({ paper }: LatestPaperHeroProps) {
                                 <Worker workerUrl="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js">
                                     <Viewer
                                         fileUrl={paper.pdf.downloadURL}
+                                        transformGetDocumentParams={noEvalParams}
                                         initialPage={0}
                                         defaultScale={0.4} // Small scale for thumbnail
                                         renderLoader={(percentages) => (

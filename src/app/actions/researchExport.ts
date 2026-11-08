@@ -145,12 +145,20 @@ export async function generateLinkedExport(idToken: string) {
     });
 
     // 5. Generate CSV
+    // 文字以 = + - @ Tab CR 開頭時前面加單引號，Excel 才不會當公式執行（2026-11-08 security-audit）
+    const csvCell = (v: unknown): string => {
+        if (v === null || v === undefined) return '""';
+        if (typeof v === "number" || typeof v === "boolean") return JSON.stringify(v);
+        let s = String(v);
+        if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+        return '"' + s.replace(/"/g, '""') + '"';
+    };
     if (rows.length === 0) return { success: true, csv: "" };
 
     const headers = Object.keys(rows[0]);
     const csvRows = [
         headers.join(","),
-        ...rows.map(row => headers.map(h => JSON.stringify((row as any)[h] ?? "")).join(","))
+        ...rows.map(row => headers.map(h => csvCell((row as any)[h])).join(","))
     ];
 
     return { success: true, csv: csvRows.join("\n") };

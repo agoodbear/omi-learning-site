@@ -14,6 +14,10 @@ import "@react-pdf-viewer/highlight/lib/styles/index.css";
 import "@react-pdf-viewer/toolbar/lib/styles/index.css";
 import "@react-pdf-viewer/search/lib/styles/index.css";
 
+// CVE-2024-4367：pdfjs 3.x 遇到惡意字型會用 eval 執行程式；關掉 eval 是官方建議的緩解（2026-11-08 security-audit）
+const noEvalParams = <T extends object>(options: T): T => ({ ...options, isEvalSupported: false });
+
+
 export interface HighlightArea {
     pageIndex: number;
     left: number;
@@ -689,6 +693,7 @@ const PDFReader = forwardRef<PDFReaderRef, PDFReaderProps>(({
                 <Worker workerUrl="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js">
                     <Viewer
                         fileUrl={url}
+                        transformGetDocumentParams={noEvalParams}
                         plugins={[highlightPluginInstance, toolbarPluginInstance, searchPluginInstance]}
                         defaultScale={SpecialZoomLevel.PageWidth}
                     />

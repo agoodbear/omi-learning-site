@@ -176,7 +176,7 @@ export default function SeedPage() {
             <div className="bg-gray-900 rounded p-6 border border-gray-800 mb-8">
                 <p className="text-gray-400 mb-4 text-sm font-mono">
                     將寫入 6 筆測試 Cases (2 OMI, 2 Mimics, 2 Electrolyte) 至 Firestore。
-                    <br />確保 firestore.rules 允許 Admin (16022) 寫入。
+                    <br />確保登入帳號有 admin custom claim（firestore.rules 只認這個）。
                 </p>
 
                 <button
